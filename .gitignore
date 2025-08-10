@@ -1,0 +1,29 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Dependency directories (uncomment if you want to ignore vendor directory)
+# vendor/
+
+# Build output directory
+bin/
+
+# IDE and editor specific files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.DS_Store # macOS specific
+
+.commit.txt
+
+test/

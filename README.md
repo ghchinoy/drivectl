@@ -24,7 +24,9 @@ A command-line tool for interacting with the Google Drive API.
 1.  Go to the [Google Cloud Console](https://console.cloud.google.com/).
 2.  Create a new project or select an existing one.
 3.  In the navigation menu, go to **APIs & Services > Library**.
-4.  Search for "Google Drive API" and enable it.
+4.  Search for and enable the following APIs:
+    *   **Google Drive API**
+    *   **Google Docs API**
 5.  Go to **APIs & Services > Credentials**.
 6.  Click **Create Credentials > OAuth client ID**.
 7.  Select **Desktop app** as the application type.
@@ -61,7 +63,6 @@ If you are on a system without a graphical browser, you can use the `--no-browse
 
 The `--query` (`-q`) flag uses the Google Drive API's query language. You can build powerful and specific queries. For more details on the query syntax, see the [official Google Drive documentation](https://developers.google.com/drive/api/v3/search-files).
 
-
 **Describe a file**
 
 ```bash
@@ -69,14 +70,30 @@ The `--query` (`-q`) flag uses the Google Drive API's query language. You can bu
 ./drivectl describe <file-id>
 ```
 
-**Get a file**
+**List tabs in a document**
+
+```bash
+# List the tabs by their index number
+./drivectl tabs <document-id>
+```
+
+**Get a file or tab content**
 
 ```bash
 # Get the content of a file and print it to the console
 ./drivectl get <file-id>
 
-# Get a Google Doc and save it as a text file
+# Get a Google Doc and save it as a text file (default format)
 ./drivectl get <google-doc-id> -o my-document.txt
+
+# Export a Google Doc as Markdown
+./drivectl get <google-doc-id> --format md -o my-document.md
+
+# Export a Google Doc as a PDF
+./drivectl get <google-doc-id> --format pdf -o my-document.pdf
+
+# Get the content of a specific tab (e.g., the first tab)
+./drivectl get <google-doc-id> --tab-index 0
 
 # Download a regular file (e.g., a PDF)
 ./drivectl get <pdf-file-id> -o my-file.pdf
