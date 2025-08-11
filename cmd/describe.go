@@ -24,7 +24,8 @@ import (
 
 var describeCmd = &cobra.Command{
 	Use:   "describe [fileId]",
-	Short: "Describes a file in Google Drive",
+	Short: "Shows detailed metadata for a specific file.",
+	Long:  `Retrieves and displays all available metadata for a given file ID from the Google Drive API. The output is formatted as a JSON object.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fileId := args[0]

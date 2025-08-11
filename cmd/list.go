@@ -27,7 +27,10 @@ var (
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "Lists files in Google Drive",
+	Short: "Lists files and folders in Google Drive.",
+	Long: `Lists files and folders in your Google Drive.
+Supports powerful filtering using the Google Drive query language via the --query flag.
+For more information on query syntax, see: https://developers.google.com/drive/api/v3/search-files`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		r, err := driveSvc.Files.List().PageSize(limit).Q(query).
 			Fields("nextPageToken, files(id, name)").Do()

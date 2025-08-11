@@ -19,16 +19,15 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"google.golang.org/api/docs/v1"
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
 )
 
 var (
-	secretFile    string
 	noBrowserAuth bool
 	driveSvc      *drive.Service
 	docsSvc       *docs.Service
@@ -36,14 +35,14 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "drivectl",
-	Short: "A command-line tool for interacting with the Google Drive API",
+	Short: "A CLI for Google Drive and Docs.",
+	Long: `drivectl is a powerful command-line tool for interacting with your Google Drive files.
+It allows you to list, describe, and download files, with advanced support for
+Google Docs, including exporting to multiple formats and accessing individual tabs.`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		secretFile := viper.GetString("secret-file")
 		if secretFile == "" {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return fmt.Errorf("could not get user home directory: %w", err)
-			}
-			secretFile = filepath.Join(home, "secrets", "client_google-drive-api_ghchinoy-genai-blackbelt-fishfooding.json")
+			return fmt.Errorf("client secret file not set. Please use the --secret-file flag or set the DRIVE_SECRETS environment variable")
 		}
 
 		ctx := context.Background()
@@ -73,6 +72,13 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&secretFile, "secret-file", "", "path to your client secrets file (default is ~/secrets/client_google-drive-api_ghchinoy-genai-blackbelt-fishfooding.json)")
+	cobra.OnInitialize(initConfig)
+	rootCmd.PersistentFlags().String("secret-file", "", "path to your client secrets file")
 	rootCmd.PersistentFlags().BoolVar(&noBrowserAuth, "no-browser-auth", false, "do not open a browser for authentication")
+	viper.BindPFlag("secret-file", rootCmd.PersistentFlags().Lookup("secret-file"))
+	viper.BindEnv("secret-file", "DRIVE_SECRETS")
+}
+
+func initConfig() {
+	viper.AutomaticEnv()
 }

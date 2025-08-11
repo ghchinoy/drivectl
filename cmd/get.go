@@ -61,7 +61,11 @@ var formatMap = map[string]string{
 
 var getCmd = &cobra.Command{
 	Use:   "get [fileId]",
-	Short: "Downloads a file from Google Drive. Google Docs can be exported to different formats.",
+	Short: "Downloads a file or exports a Google Doc.",
+	Long: `Downloads a file from Google Drive.
+For standard files (PDFs, images, etc.), it downloads the raw content.
+For Google Docs, it can export the entire document to various formats (txt, md, pdf, etc.) using the --format flag.
+It can also extract the plain text content of a single tab from a Google Doc using the --tab-index flag.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fileId := args[0]

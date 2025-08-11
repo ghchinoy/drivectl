@@ -22,7 +22,8 @@ import (
 
 var tabsCmd = &cobra.Command{
 	Use:   "tabs [documentId]",
-	Short: "Lists the tabs in a Google Doc",
+	Short: "Lists the tabs within a Google Doc.",
+	Long:  `Lists the available tabs for a given Google Doc by their index number. This uses the Google Docs API.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		documentId := args[0]
