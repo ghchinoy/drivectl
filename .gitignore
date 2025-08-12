@@ -27,3 +27,6 @@ bin/
 .commit.txt
 
 test/
+
+# Ignore the drivectl binary
+drivectl
