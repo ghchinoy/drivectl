@@ -49,8 +49,8 @@ This document outlines the manual test cases to verify the Google Sheets functio
 
 ### Test Case 6: `docs tabs` command
 
-- [ ] **Action:** Run `drivectl docs tabs <document-id>`
-- [ ] **Verification:** Does the command print the list of tabs in the document?
+- [x] **Action:** Run `drivectl docs tabs <document-id>`
+- [x] **Verification:** Does the command print the list of tabs in the document?
 
 ---
 
