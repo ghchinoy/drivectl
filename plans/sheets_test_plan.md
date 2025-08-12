@@ -32,11 +32,11 @@ This document outlines the manual test cases to verify the Google Sheets functio
 
 ---
 
-### Test Case 4: `sheets update-range` command (To Be Implemented)
+### Test Case 4: `sheets update-range` command
 
-- [ ] **Action:** Run `drivectl sheets update-range <spreadsheet-id> --sheet <sheet-name> --range <A1-notation> --values <values>`
-- [ ] **Verification:** Does the command update the specified range?
-- [ ] **Verification:** Run `get-range` again to confirm the update.
+- [x] **Action:** Run `drivectl sheets update-range <spreadsheet-id> --sheet <sheet-name> --range <A1-notation> --values <values>`
+- [x] **Verification:** Does the command update the specified range?
+- [x] **Verification:** Run `get-range` again to confirm the update.
 
 ---
 

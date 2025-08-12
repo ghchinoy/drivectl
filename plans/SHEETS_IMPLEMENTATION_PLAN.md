@@ -34,7 +34,7 @@ Before proceeding with the implementation, I would like to get your feedback on 
 - [x] Implement the `ListSheets` function in `internal/drive/sheets.go` to list the sheets in a spreadsheet.
 - [x] Implement the `GetSheetAsCSV` function in `internal/drive/sheets.go` to get a sheet as CSV.
 - [x] Implement the `GetSheetRange` function in `internal/drive/sheets.go` to get a specific range from a sheet.
-- [ ] Implement the `UpdateSheetRange` function in `internal/drive/sheets.go` to update a specific range in a sheet.
+- [x] Implement the `UpdateSheetRange` function in `internal/drive/sheets.go` to update a specific range in a sheet.
 
 ### Phase 3: Cobra Command Implementation
 
@@ -42,7 +42,7 @@ Before proceeding with the implementation, I would like to get your feedback on 
 - [x] Create a new file `cmd/docs.go` and move the `tabs` command under a new `docs` subcommand.
 - [x] Update the `root.go` file to add the new `sheets` and `docs` commands.
 - [x] Implement the `RunE` functions for these commands to call the functions in `internal/drive/sheets.go` and `internal/drive/drive.go`.
-- [ ] Add the `update-range` subcommand to `cmd/sheets.go`.
+- [x] Add the `update-range` subcommand to `cmd/sheets.go`.
 
 ### Phase 4: MCP Integration
 
@@ -57,4 +57,4 @@ Before proceeding with the implementation, I would like to get your feedback on 
 - [x] Update the `sheets_test_plan.md` with the current status.
 - [ ] Update the `README.md` file to document the new `sheets` and `docs` commands.
 - [ ] Update the `MCP_IMPLEMENTATION_PLAN.md` file with the new plan.
-- [ ] Create a `.commit.txt` file with a summary of the changes.
+- [x] Create a `.commit.txt` file with a summary of the changes.

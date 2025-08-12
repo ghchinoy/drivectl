@@ -124,6 +124,14 @@ type GetSheetRangeArgs struct {
 	Range         string `json:"range"`
 }
 
+// UpdateSheetRangeArgs defines the arguments for the sheets update-range tool.
+type UpdateSheetRangeArgs struct {
+	SpreadsheetID string `json:"spreadsheet-id"`
+	SheetName     string `json:"sheet-name"`
+	Range         string `json:"range"`
+	Value         string `json:"value"`
+}
+
 // driveQueryCheatSheetHandler is a resource handler that returns a cheat sheet of Drive query examples.
 func driveQueryCheatSheetHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.ReadResourceParams) (*mcp.ReadResourceResult, error) {
 	return &mcp.ReadResourceResult{
@@ -264,7 +272,7 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 
 							return &mcp.CallToolResultFor[any]{
 								Content: []mcp.Content{
-									&mcp.TextContent{Text: strings.Join(tabs, "\\n")},
+									&mcp.TextContent{Text: strings.Join(tabs, "\n")},
 								},
 							}, nil
 					})
@@ -294,7 +302,7 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 
 							return &mcp.CallToolResultFor[any]{
 								Content: []mcp.Content{
-									&mcp.TextContent{Text: strings.Join(sheets, "\\n")},
+									&mcp.TextContent{Text: strings.Join(sheets, "\n")},
 								},
 							}, nil
 					})
@@ -353,6 +361,40 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 							return &mcp.CallToolResultFor[any]{
 								Content: []mcp.Content{
 									&mcp.TextContent{Text: fmt.Sprintf("%v", values)},
+								},
+							}, nil
+					})
+				case "update-range":
+					mcp.AddTool(server, &mcp.Tool{
+						Name:        "sheets.update-range",
+						Description: subCommand.Long,
+					}, func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[UpdateSheetRangeArgs]) (*mcp.CallToolResultFor[any], error) {
+						if params.Arguments.SpreadsheetID == "" {
+							return nil, fmt.Errorf("spreadsheet-id is a required argument")
+						}
+						if params.Arguments.SheetName == "" {
+							return nil, fmt.Errorf("sheet-name is a required argument")
+						}
+						if params.Arguments.Range == "" {
+							return nil, fmt.Errorf("range is a required argument")
+						}
+						if params.Arguments.Value == "" {
+							return nil, fmt.Errorf("value is a required argument")
+						}
+						sheetsSvc, err := getSheetsSvc(ctx)
+							if err != nil {
+								return nil, err
+							}
+
+							values := [][]interface{}{{params.Arguments.Value}}
+							err = drive.UpdateSheetRange(sheetsSvc, params.Arguments.SpreadsheetID, params.Arguments.SheetName, params.Arguments.Range, values)
+							if err != nil {
+								return nil, fmt.Errorf("unable to update sheet range: %w", err)
+							}
+
+							return &mcp.CallToolResultFor[any]{
+								Content: []mcp.Content{
+									&mcp.TextContent{Text: "Sheet updated successfully."},
 								},
 							}, nil
 					})
