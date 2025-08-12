@@ -21,7 +21,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var tabsCmd = &cobra.Command{
+var docsCmd = &cobra.Command{
+	Use:   "docs",
+	Short: "Interact with Google Docs",
+	Long:  `A set of commands to interact with Google Docs.`,
+}
+
+var docsTabsCmd = &cobra.Command{
 	Use:   "tabs [documentId]",
 	Short: "Lists the tabs within a Google Doc.",
 	Long:  `Lists the available tabs for a given Google Doc by their index number. This uses the Google Docs API.`,
@@ -47,5 +53,6 @@ var tabsCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(tabsCmd)
+	rootCmd.AddCommand(docsCmd)
+	docsCmd.AddCommand(docsTabsCmd)
 }

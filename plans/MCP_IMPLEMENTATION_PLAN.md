@@ -53,28 +53,19 @@ The new architecture will be as follows:
 - [x] Implement the logic to start the server on HTTP (`--mcp-http`).
 - [x] Refactor the code to abstract the Drive and Docs APIs into an `internal/` package.
 
-### Phase 3: Testing and Verification
+### Phase 3: Cobra Command Implementation
 
-- [x] Execute the manual test plan in `plans/mcp_test_plan.md`.
-- [x] **Regression Testing:**
-    - [x] Verify that the existing CLI functionality is unaffected.
-- [x] **MCP Stdio Mode Testing:**
-    - [x] Test listing tools.
-    - [x] Test calling tools with and without arguments.
-- [x] **MCP HTTP Mode Testing:**
-    - [x] Test listing tools.
-    - [x] Test calling tools with and without arguments.
-- [x] **Error Handling Testing:**
-    - [x] Test calling tools with invalid arguments.
-    - [x] Test calling non-existent tools.
+- [ ] Create a new file `cmd/sheets.go` and add the `sheets` command with its subcommands (`list`, `get`, `get-range`). The `list` subcommand will be an alias for `drivectl list -q "mimeType='application/vnd.google-apps.spreadsheet'"`.
+- [ ] Create a new file `cmd/docs.go` and move the `tabs` command under a new `docs` subcommand. Add a `list` subcommand to `docs` as an alias for `drivectl list -q "mimeType='application/vnd.google-apps.document'"`.
+- [ ] Update the `root.go` file to add the new `sheets` and `docs` commands.
+- [ ] Implement the `RunE` functions for these commands to call the functions in `internal/drive/sheets.go` and `internal/drive/drive.go`.
 
-### Phase 4: Documentation and Cleanup
+### Phase 4: MCP Integration
 
-- [ ] Update the `README.md` to document the new MCP server functionality.
-- [ ] Review and refactor the code for clarity and maintainability.
-- [x] Add Go doc comments to all the methods.
-- [x] Make sure the long command descriptions are being used in `mcp/server.go`.
-- [x] Add a new MCP resource with a cheat sheet of Drive query examples.
+- [ ] Add new tool handlers in `mcp/server.go` for the new `sheets` and `docs` commands, using the `.` notation for the tool names (e.g., `sheets.list`).
+- [ ] Define the `Args` structs for the new tools.
+- [ ] Implement the tool handlers to call the functions in `internal/drive/sheets.go`.
+- [ ] Add a new MCP resource that provides an explanation of A1 notation.
 
 ## 3. Lessons Learned
 

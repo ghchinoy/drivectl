@@ -13,6 +13,7 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/docs/v1"
 	"google.golang.org/api/drive/v3"
+	"google.golang.org/api/sheets/v4"
 )
 
 // NewOAuthClient creates a new HTTP client with OAuth 2.0 authentication.
@@ -22,7 +23,7 @@ func NewOAuthClient(ctx context.Context, secretFile string, noBrowserAuth bool) 
 		return nil, fmt.Errorf("unable to read client secret file: %v", err)
 	}
 
-	config, err := google.ConfigFromJSON(b, drive.DriveReadonlyScope, docs.DocumentsReadonlyScope)
+	config, err := google.ConfigFromJSON(b, drive.DriveReadonlyScope, docs.DocumentsReadonlyScope, sheets.SpreadsheetsScope)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse client secret file to config: %v", err)
 	}

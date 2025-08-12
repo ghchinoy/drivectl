@@ -16,6 +16,7 @@ import (
 	"google.golang.org/api/docs/v1"
 	googledrive "google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
+	"google.golang.org/api/sheets/v4"
 )
 
 const driveQueryCheatSheet = `
@@ -63,6 +64,25 @@ func getDocsSvc(ctx context.Context) (*docs.Service, error) {
 	return docsSvc, nil
 }
 
+// getSheetsSvc creates a new Google Sheets service client.
+func getSheetsSvc(ctx context.Context) (*sheets.Service, error) {
+	viper.AutomaticEnv()
+	secretFile := viper.GetString("secret-file")
+	if secretFile == "" {
+		return nil, fmt.Errorf("client secret file not set. Please use the --secret-file flag or set the DRIVE_SECRETS environment variable")
+	}
+	noBrowserAuth := viper.GetBool("no-browser-auth")
+	client, err := drive.NewOAuthClient(ctx, secretFile, noBrowserAuth)
+	if err != nil {
+		return nil, fmt.Errorf("could not create oauth client: %w", err)
+	}
+	sheetsSvc, err := sheets.NewService(ctx, option.WithHTTPClient(client))
+	if err != nil {
+		return nil, fmt.Errorf("could not create sheets service: %w", err)
+	}
+	return sheetsSvc, nil
+}
+
 // ListArgs defines the arguments for the list tool.
 type ListArgs struct {
 	Limit int64  `json:"limit"`
@@ -84,6 +104,24 @@ type DescribeArgs struct {
 // TabsArgs defines the arguments for the tabs tool.
 type TabsArgs struct {
 	DocumentID string `json:"document-id"`
+}
+
+// ListSheetsArgs defines the arguments for the sheets list tool.
+type ListSheetsArgs struct {
+	SpreadsheetID string `json:"spreadsheet-id"`
+}
+
+// GetSheetArgs defines the arguments for the sheets get tool.
+type GetSheetArgs struct {
+	SpreadsheetID string `json:"spreadsheet-id"`
+	SheetName     string `json:"sheet-name"`
+}
+
+// GetSheetRangeArgs defines the arguments for the sheets get-range tool.
+type GetSheetRangeArgs struct {
+	SpreadsheetID string `json:"spreadsheet-id"`
+	SheetName     string `json:"sheet-name"`
+	Range         string `json:"range"`
 }
 
 // driveQueryCheatSheetHandler is a resource handler that returns a cheat sheet of Drive query examples.
@@ -201,31 +239,125 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 					},
 				}, nil
 			})
-		case "tabs":
-			mcp.AddTool(server, &mcp.Tool{
-				Name:        command.Name(),
-				Description: command.Long,
-			}, func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[TabsArgs]) (*mcp.CallToolResultFor[any], error) {
-				if params.Arguments.DocumentID == "" {
-					return nil, fmt.Errorf("document-id is a required argument")
-				}
+		case "docs":
+			for _, subCmd := range command.Commands() {
+				subCommand := subCmd
+				switch subCommand.Name() {
+				case "tabs":
+					mcp.AddTool(server, &mcp.Tool{
+						Name:        "docs.tabs",
+						Description: subCommand.Long,
+					}, func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[TabsArgs]) (*mcp.CallToolResultFor[any], error) {
+						if params.Arguments.DocumentID == "" {
+							return nil, fmt.Errorf("document-id is a required argument")
+						}
 
-				docsSvc, err := getDocsSvc(ctx)
-				if err != nil {
-					return nil, err
-				}
+						docsSvc, err := getDocsSvc(ctx)
+							if err != nil {
+								return nil, err
+							}
 
-				tabs, err := drive.GetTabs(docsSvc, params.Arguments.DocumentID)
-				if err != nil {
-					return nil, fmt.Errorf("unable to get tabs: %w", err)
-				}
+						tabs, err := drive.GetTabs(docsSvc, params.Arguments.DocumentID)
+							if err != nil {
+								return nil, fmt.Errorf("unable to get tabs: %w", err)
+							}
 
-				return &mcp.CallToolResultFor[any]{
-					Content: []mcp.Content{
-						&mcp.TextContent{Text: strings.Join(tabs, "\\n")},
-					},
-				}, nil
-			})
+							return &mcp.CallToolResultFor[any]{
+								Content: []mcp.Content{
+									&mcp.TextContent{Text: strings.Join(tabs, "\\n")},
+								},
+							}, nil
+					})
+				}
+			}
+		case "sheets":
+			for _, subCmd := range command.Commands() {
+				subCommand := subCmd
+				switch subCommand.Name() {
+				case "list":
+					mcp.AddTool(server, &mcp.Tool{
+						Name:        "sheets.list",
+						Description: subCommand.Long,
+					}, func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[ListSheetsArgs]) (*mcp.CallToolResultFor[any], error) {
+						if params.Arguments.SpreadsheetID == "" {
+							return nil, fmt.Errorf("spreadsheet-id is a required argument")
+						}
+						sheetsSvc, err := getSheetsSvc(ctx)
+							if err != nil {
+								return nil, err
+							}
+
+						sheets, err := drive.ListSheets(sheetsSvc, params.Arguments.SpreadsheetID)
+							if err != nil {
+								return nil, fmt.Errorf("unable to list sheets: %w", err)
+							}
+
+							return &mcp.CallToolResultFor[any]{
+								Content: []mcp.Content{
+									&mcp.TextContent{Text: strings.Join(sheets, "\\n")},
+								},
+							}, nil
+					})
+				case "get":
+					mcp.AddTool(server, &mcp.Tool{
+						Name:        "sheets.get",
+						Description: subCommand.Long,
+					}, func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[GetSheetArgs]) (*mcp.CallToolResultFor[any], error) {
+						if params.Arguments.SpreadsheetID == "" {
+							return nil, fmt.Errorf("spreadsheet-id is a required argument")
+						}
+						if params.Arguments.SheetName == "" {
+							return nil, fmt.Errorf("sheet-name is a required argument")
+						}
+						sheetsSvc, err := getSheetsSvc(ctx)
+							if err != nil {
+								return nil, err
+							}
+
+							csv, err := drive.GetSheetAsCSV(sheetsSvc, params.Arguments.SpreadsheetID, params.Arguments.SheetName)
+							if err != nil {
+								return nil, fmt.Errorf("unable to get sheet as csv: %w", err)
+							}
+
+							return &mcp.CallToolResultFor[any]{
+								Content: []mcp.Content{
+									&mcp.TextContent{Text: csv},
+								},
+							}, nil
+					})
+				case "get-range":
+					mcp.AddTool(server, &mcp.Tool{
+						Name:        "sheets.get-range",
+						Description: subCommand.Long,
+					}, func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[GetSheetRangeArgs]) (*mcp.CallToolResultFor[any], error) {
+						if params.Arguments.SpreadsheetID == "" {
+							return nil, fmt.Errorf("spreadsheet-id is a required argument")
+						}
+						if params.Arguments.SheetName == "" {
+							return nil, fmt.Errorf("sheet-name is a required argument")
+						}
+						if params.Arguments.Range == "" {
+							return nil, fmt.Errorf("range is a required argument")
+						}
+						sheetsSvc, err := getSheetsSvc(ctx)
+							if err != nil {
+								return nil, err
+							}
+
+							values, err := drive.GetSheetRange(sheetsSvc, params.Arguments.SpreadsheetID, params.Arguments.SheetName, params.Arguments.Range)
+							if err != nil {
+								return nil, fmt.Errorf("unable to get sheet range: %w", err)
+							}
+
+							// TODO: format values
+							return &mcp.CallToolResultFor[any]{
+								Content: []mcp.Content{
+									&mcp.TextContent{Text: fmt.Sprintf("%v", values)},
+								},
+							}, nil
+					})
+				}
+			}
 		}
 	}
 
