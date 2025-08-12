@@ -30,20 +30,21 @@ func GetSheetAsCSV(sheetsSvc *sheets.Service, spreadsheetId string, sheetName st
 		return "", fmt.Errorf("unable to retrieve data from sheet: %w", err)
 	}
 
-	var csv string
 	if len(resp.Values) == 0 {
 		return "", fmt.Errorf("no data found")
 	}
 
+	var csvBuilder strings.Builder
 	for _, row := range resp.Values {
 		var csvRow []string
 		for _, cell := range row {
 			csvRow = append(csvRow, fmt.Sprintf("%v", cell))
 		}
-		csv += strings.Join(csvRow, ",") + "\n"
+		csvBuilder.WriteString(strings.Join(csvRow, ","))
+		csvBuilder.WriteString("\n")
 	}
 
-	return csv, nil
+	return csvBuilder.String(), nil
 }
 
 // GetSheetRange gets a specific range from a sheet.
