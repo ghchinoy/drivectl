@@ -99,6 +99,49 @@ The `--query` (`-q`) flag uses the Google Drive API's query language. You can bu
 ./drivectl get <pdf-file-id> -o my-file.pdf
 ```
 
+## MCP Server Mode
+
+`drivectl` can also be run as an MCP server, exposing its commands as tools that can be called by an MCP client.
+
+### Starting the Server
+
+You can start the MCP server in two modes:
+
+**Stdio Mode:**
+
+```bash
+./drivectl --mcp
+```
+
+This will start the server on the standard input/output.
+
+**HTTP Mode:**
+
+```bash
+./drivectl --mcp-http :8080
+```
+
+This will start the server on port 8080.
+
+### Interacting with the Server
+
+You can use the `mcptools` CLI to interact with the server.
+
+**List available tools:**
+
+```bash
+mcptools tools ./drivectl --mcp
+```
+
+**Call a tool:**
+
+```bash
+# List files
+mcptools call list ./drivectl --mcp
+
+# Get a file
+mcptools call get -p '{"file-id": "<your-file-id>"}' ./drivectl --mcp
+```
 
 # Disclaimer
 
