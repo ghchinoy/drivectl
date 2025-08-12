@@ -91,42 +91,6 @@ The most important principle is to decouple your core application logic from you
 *   **Testability:** The core logic can be tested independently of the CLI.
 *   **Maintainability:** The code is cleaner, more modular, and easier to understand.
 
-**Example:**
-
-```go
-// Bad: Logic in Cobra command
-// cmd/list.go
-var listCmd = &cobra.Command{
-    Use:   "list",
-    RunE: func(cmd *cobra.Command, args []string) error {
-        // ... API call logic here ...
-    },
-}
-
-// Good: Logic in a separate package
-// internal/drive/drive.go
-func ListFiles(srv *drive.Service, limit int64, query string) ([]*drive.File, error) {
-    // ... API call logic here ...
-}
-
-// cmd/list.go
-var listCmd = &cobra.Command{
-    Use:   "list",
-    RunE: func(cmd *cobra.Command, args []string) error {
-        files, err := drive.ListFiles(driveSvc, limit, query)
-        // ... handle error and print files ...
-    },
-}
-
-// mcp/server.go
-mcp.AddTool(server, &mcp.Tool{
-    Name: "list",
-}, func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[ListArgs]) (*mcp.CallToolResultFor[any], error) {
-    files, err := drive.ListFiles(driveSvc, params.Arguments.Limit, params.Arguments.Query)
-    // ... handle error and return result ...
-})
-```
-
 ### 2. Structuring Your MCP Server
 
 The `mcp/server.go` file is the heart of your MCP server. Here's a good way to structure it:
@@ -142,70 +106,4 @@ The `mcp/server.go` file is the heart of your MCP server. Here's a good way to s
 
 A common pattern is to iterate through your Cobra commands and create a corresponding MCP tool for each one.
 
-*   **Subcommands:** For commands with subcommands (like `drivectl sheets list`), use a `.` separator in the MCP tool name to create a "namespace" (e.g., `sheets.list`). This makes the tool hierarchy clear to the client.
-
-```go
-// mcp/server.go
-for _, cmd := range rootCmd.Commands() {
-    command := cmd
-    switch command.Name() {
-    case "sheets":
-        for _, subCmd := range command.Commands() {
-            subCommand := subCmd
-            mcp.AddTool(server, &mcp.Tool{
-                Name: fmt.Sprintf("%s.%s", command.Name(), subCommand.Name()),
-                // ...
-            }, /* ... handler ... */)
-        }
-    // ... other commands ...
-    }
-}
-```
-
-### 4. Handling Configuration and Secrets
-
-*   **Viper and Environment Variables:** Use the [Viper](https://github.com/spf13/viper) library to manage configuration. When running in MCP mode, `drivectl` is a child process of `mcptools`, so it's crucial to use `viper.AutomaticEnv()` to ensure that environment variables (like `DRIVE_SECRETS`) are correctly read.
-
-### 5. Debugging
-
-Debugging MCP servers can be tricky. Here are some tips:
-
-*   **Logging:** Log important events and errors to a file. This is essential for debugging, as the server's stdout is used for the MCP protocol.
-*   **`curl`:** For HTTP-based MCP servers, `curl` is your best friend. You can use it to send raw JSON-RPC requests and inspect the server's responses. This is especially useful for debugging the initialization handshake.
-*   **Read the Source:** The `mcp-go` SDK is still evolving. When in doubt, read the source code to understand the expected behavior.
-
-### 6. MCP Resources
-
-In addition to tools, MCP servers can expose "resources". A resource is a piece of content that the client can read.
-
-*   **Use Cases:** Resources are great for providing help text, cheat sheets, or any other static content that might be useful to the client.
-*   **Implementation:**
-    1.  Define a handler function that returns the content of the resource.
-    2.  Register the resource with the server using `server.AddResource`.
-
-**Example:**
-
-```go
-// mcp/server.go
-const a1NotationCheatSheet = `...`
-
-func a1NotationCheatSheetHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.ReadResourceParams) (*mcp.ReadResourceResult, error) {
-    return &mcp.ReadResourceResult{
-        Contents: []*mcp.ResourceContents{
-            {
-                URI:      params.URI,
-                MIMEType: "text/plain",
-                Text:     a1NotationCheatSheet,
-            },
-        },
-    }, nil
-}
-
-// in Start()
-server.AddResource(&mcp.Resource{
-    Name:        "a1-notation-cheat-sheet",
-    Description: "A cheat sheet of example A1 notation for Google Sheets.",
-    MIMEType:    "text/plain",
-    URI:         "embedded:a1-notation-cheat-sheet",
-}, a1NotationCheatSheetHandler)
-```
+*   **Subcommands:** For commands with subcommands (like `drivectl sheets list`), use a `.` separator in the MCP tool name to create a 
