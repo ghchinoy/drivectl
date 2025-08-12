@@ -18,6 +18,13 @@ import (
 	"google.golang.org/api/option"
 )
 
+const driveQueryCheatSheet = `
+- "mimeType='application/vnd.google-apps.folder'"
+- "name contains 'meeting notes'"
+- "modifiedTime > '2025-01-01T00:00:00Z'"
+- "trashed = false"
+`
+
 // getDriveSvc creates a new Google Drive service client.
 func getDriveSvc(ctx context.Context) (*googledrive.Service, error) {
 	viper.AutomaticEnv()
@@ -79,6 +86,19 @@ type TabsArgs struct {
 	DocumentID string `json:"document-id"`
 }
 
+// driveQueryCheatSheetHandler is a resource handler that returns a cheat sheet of Drive query examples.
+func driveQueryCheatSheetHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.ReadResourceParams) (*mcp.ReadResourceResult, error) {
+	return &mcp.ReadResourceResult{
+		Contents: []*mcp.ResourceContents{
+			{
+				URI:      params.URI,
+				MIMEType: "text/plain",
+				Text:     driveQueryCheatSheet,
+			},
+		},
+	}, nil
+}
+
 // Start starts the MCP server.
 func Start(rootCmd *cobra.Command, httpAddr string) error {
 	server := mcp.NewServer(&mcp.Implementation{Name: "drivectl"}, nil)
@@ -112,7 +132,6 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 				} else {
 					for _, i := range files {
 						output += fmt.Sprintf("%s (%s)\n", i.Name, i.Id)
-
 					}
 				}
 
@@ -203,12 +222,19 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 
 				return &mcp.CallToolResultFor[any]{
 					Content: []mcp.Content{
-						&mcp.TextContent{Text: strings.Join(tabs, "\n")},
+						&mcp.TextContent{Text: strings.Join(tabs, "\\n")},
 					},
 				}, nil
 			})
 		}
 	}
+
+	server.AddResource(&mcp.Resource{
+		Name:        "drive-query-cheat-sheet",
+		Description: "A cheat sheet of example Google Drive query examples.",
+		MIMEType:    "text/plain",
+		URI:         "embedded:drive-query-cheat-sheet",
+	}, driveQueryCheatSheetHandler)
 
 	if httpAddr != "" {
 		handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
