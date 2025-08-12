@@ -26,6 +26,15 @@ const driveQueryCheatSheet = `
 - "trashed = false"
 `
 
+const a1NotationCheatSheet = `
+A1 notation is a way to specify a cell or a range of cells in a spreadsheet. It consists of the column letter(s) followed by the row number.
+
+Examples:
+- A1 refers to the cell at the intersection of column A and row 1.
+- A1:B2 refers to the range of cells from A1 to B2.
+- Sheet1!A1:B2 refers to the range A1:B2 on the sheet named "Sheet1".
+`
+
 // getDriveSvc creates a new Google Drive service client.
 func getDriveSvc(ctx context.Context) (*googledrive.Service, error) {
 	viper.AutomaticEnv()
@@ -142,7 +151,20 @@ func driveQueryCheatSheetHandler(ctx context.Context, ss *mcp.ServerSession, par
 				Text:     driveQueryCheatSheet,
 			},
 		},
-	}, nil
+	},
+}
+
+// a1NotationCheatSheetHandler is a resource handler that returns a cheat sheet of A1 notation examples.
+func a1NotationCheatSheetHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.ReadResourceParams) (*mcp.ReadResourceResult, error) {
+	return &mcp.ReadResourceResult{
+		Contents: []*mcp.ResourceContents{
+			{
+				URI:      params.URI,
+				MIMEType: "text/plain",
+				Text:     a1NotationCheatSheet,
+			},
+		},
+	},
 }
 
 // Start starts the MCP server.
@@ -409,6 +431,13 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 		MIMEType:    "text/plain",
 		URI:         "embedded:drive-query-cheat-sheet",
 	}, driveQueryCheatSheetHandler)
+
+	server.AddResource(&mcp.Resource{
+		Name:        "a1-notation-cheat-sheet",
+		Description: "A cheat sheet of example A1 notation for Google Sheets.",
+		MIMEType:    "text/plain",
+		URI:         "embedded:a1-notation-cheat-sheet",
+	}, a1NotationCheatSheetHandler)
 
 	if httpAddr != "" {
 		handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {

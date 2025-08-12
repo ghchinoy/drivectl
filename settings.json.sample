@@ -1,0 +1,10 @@
+{
+  "//": "This is a sample settings file for the Gemini CLI.",
+  "//": "Copy this file to .gemini/settings.json and fill in your values.",
+  "credentials": {
+    "apiKey": "YOUR_API_KEY"
+  },
+  "codeCompletion": {
+    "enabled": true
+  }
+}
