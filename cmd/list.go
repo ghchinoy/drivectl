@@ -17,6 +17,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/ghchinoy/drivectl/internal/drive"
 	"github.com/spf13/cobra"
 )
 
@@ -32,17 +33,16 @@ var listCmd = &cobra.Command{
 Supports powerful filtering using the Google Drive query language via the --query flag.
 For more information on query syntax, see: https://developers.google.com/drive/api/v3/search-files`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		r, err := driveSvc.Files.List().PageSize(limit).Q(query).
-			Fields("nextPageToken, files(id, name)").Do()
+		files, err := drive.ListFiles(driveSvc, limit, query)
 		if err != nil {
 			return fmt.Errorf("unable to retrieve files: %w", err)
 		}
 
 		fmt.Println("Files:")
-		if len(r.Files) == 0 {
+		if len(files) == 0 {
 			fmt.Println("No files found.")
 		} else {
-			for _, i := range r.Files {
+			for _, i := range files {
 				fmt.Printf("%s (%s)\n", i.Name, i.Id)
 			}
 		}
