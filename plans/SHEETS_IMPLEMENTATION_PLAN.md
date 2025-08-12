@@ -38,7 +38,7 @@ Before proceeding with the implementation, I would like to get your feedback on 
 
 ### Phase 3: Cobra Command Implementation
 
-- [x] Create a new file `cmd/sheets.go` and add the `sheets` command with its subcommands (`list`, `get`, `get-range`).
+- [x] Create a new file `cmd/sheets.go` and add the `sheets` command with its subcommands (`list`, `get`, `get-range`, `update-range`).
 - [x] Create a new file `cmd/docs.go` and move the `tabs` command under a new `docs` subcommand.
 - [x] Update the `root.go` file to add the new `sheets` and `docs` commands.
 - [x] Implement the `RunE` functions for these commands to call the functions in `internal/drive/sheets.go` and `internal/drive/drive.go`.
@@ -46,15 +46,15 @@ Before proceeding with the implementation, I would like to get your feedback on 
 
 ### Phase 4: MCP Integration
 
-- [ ] Add new tool handlers in `mcp/server.go` for the new `sheets` and `docs` commands, using the `.` notation for the tool names (e.g., `sheets.list`).
-- [ ] Define the `Args` structs for the new tools.
-- [ ] Implement the tool handlers to call the functions in `internal/drive/sheets.go`.
-- [ ] Add a new MCP resource that provides an explanation of A1 notation.
+- [x] Add new tool handlers in `mcp/server.go` for the new `sheets` and `docs` commands, using the `.` notation for the tool names (e.g., `sheets.list`).
+- [x] Define the `Args` structs for the new tools.
+- [x] Implement the tool handlers to call the functions in `internal/drive/sheets.go`.
+- [x] Add a new MCP resource that provides an explanation of A1 notation.
 
 ### Phase 5: Testing and Documentation
 
 - [x] Create a new `sheets_test_plan.md` file with manual test cases for the new functionality.
 - [x] Update the `sheets_test_plan.md` with the current status.
-- [ ] Update the `README.md` file to document the new `sheets` and `docs` commands.
-- [ ] Update the `MCP_IMPLEMENTATION_PLAN.md` file with the new plan.
+- [x] Update the `README.md` file to document the new `sheets` and `docs` commands.
+- [x] Update the `MCP_IMPLEMENTATION_PLAN.md` file with the new plan.
 - [x] Create a `.commit.txt` file with a summary of the changes.

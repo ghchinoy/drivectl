@@ -179,7 +179,6 @@ mcptools call get -p '{"file-id": "<your-file-id>"}' ./drivectl --mcp
 
 This repository contains a sample `settings.json.sample` file. To use this tool with the Gemini CLI, you should copy this file to `.gemini/settings.json` in your project root and replace the placeholder values with your actual credentials.
 
-The `.gemini/` directory and its contents are ignored by git.
 
 # Disclaimer
 
