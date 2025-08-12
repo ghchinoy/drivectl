@@ -136,8 +136,10 @@ func GetTabs(docsSvc *docs.Service, documentId string) ([]string, error) {
 	}
 
 	var tabs []string
-	for i := range doc.Tabs {
-		tabs = append(tabs, fmt.Sprintf("Tab %d", i))
+	for _, t := range doc.Tabs {
+		if t.TabProperties != nil {
+			tabs = append(tabs, t.TabProperties.Title)
+		}
 	}
 	return tabs, nil
 }
