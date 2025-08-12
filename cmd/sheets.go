@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
+	"text/tabwriter"
 
 	"github.com/ghchinoy/drivectl/internal/drive"
 	"github.com/spf13/cobra"
@@ -54,9 +56,9 @@ var sheetsGetCmd = &cobra.Command{
 		if sheetsOutputFile != "" {
 			err := os.WriteFile(sheetsOutputFile, []byte(csv), 0644)
 			if err != nil {
-				return fmt.Errorf("failed to write to output file %s: %w", sheetsOutputFile, err)
+				return fmt.Errorf("failed to write to output file %s: %%w", sheetsOutputFile, err)
 			}
-			fmt.Printf("Successfully saved sheet to %s\n", sheetsOutputFile)
+			fmt.Printf("Successfully saved sheet to %%s\n", sheetsOutputFile)
 		} else {
 			fmt.Println(csv)
 		}
@@ -75,8 +77,19 @@ var sheetsGetRangeCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		// TODO: Print the values in a nice format.
-		fmt.Println(values)
+
+		w := new(tabwriter.Writer)
+		// Format in tab-separated columns with a tab stop of 8.
+		w.Init(os.Stdout, 0, 8, 0, '\t', 0)
+		for _, row := range values {
+			var rowStr []string
+			for _, cell := range row {
+				rowStr = append(rowStr, fmt.Sprintf("%v", cell))
+			}
+			fmt.Fprintln(w, strings.Join(rowStr, "\t"))
+		}
+		w.Flush()
+
 		return nil
 	},
 }
