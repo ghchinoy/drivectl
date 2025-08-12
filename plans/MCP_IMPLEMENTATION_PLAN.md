@@ -184,4 +184,6 @@ The `mcp-go` SDK has some nuances that are important to be aware of:
 *   **`CallToolResultFor` struct:** The `CallToolResultFor` struct has a `StructuredContent` field for returning structured data and a `Content` field for returning unstructured data. It's important to use the correct field based on the type of data you are returning.
 *   **`mcptools` limitations:** The `mcptools` CLI is a useful tool for testing MCP servers, but it has some limitations. For example, it doesn't have a flag to specify the server address for the HTTP transport, and it expects the `content` field in the tool result to be an array.
 
-By following these lessons learned, developers can more easily integrate their Cobra-based command-line tools with the MCP Go SDK and build powerful, flexible MCP servers.
+**5. Google Drive API Nuances**
+
+*   **Query Format:** The Google Drive API's query language requires quotes around the values in the query string (e.g., `name contains 'drivectl'`). It's important to validate the query format before sending it to the API to avoid `400 Bad Request` errors.
