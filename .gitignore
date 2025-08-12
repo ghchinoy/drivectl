@@ -30,3 +30,4 @@ test/
 
 # Ignore the drivectl binary
 drivectl
+*.log
