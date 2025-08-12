@@ -33,7 +33,7 @@ A command-line tool for interacting with the Google Drive API.
 8.  Give it a name (e.g., "drivectl").
 9.  Click **Create**. A window will appear with your client ID and client secret. Click **Download JSON**.
 10. Rename the downloaded file to `client_secret.json`.
-11. Place this file in a secure location. By default, `drivectl` looks for it at `~/secrets/client_google-drive-api_ghchinoy-genai-blackbelt-fishfooding.json`, but you can specify a different path using the `--secret-file` flag.
+11. Place this file in a secure location. You will need to provide the path to this file using the `--secret-file` flag or by setting the `DRIVE_SECRETS` environment variable.
 
 ## Usage
 
@@ -99,6 +99,39 @@ The `--query` (`-q`) flag uses the Google Drive API's query language. You can bu
 ./drivectl get <pdf-file-id> -o my-file.pdf
 ```
 
+### Google Sheets and Docs
+
+**List sheets in a spreadsheet**
+
+```bash
+./drivectl sheets list <spreadsheet-id>
+```
+
+**Get a sheet as CSV**
+
+```bash
+./drivectl sheets get <spreadsheet-id> --sheet <sheet-name>
+```
+
+**Get a specific range from a sheet**
+
+```bash
+./drivectl sheets get-range <spreadsheet-id> --sheet <sheet-name> --range <A1-notation>
+```
+
+**Update a specific range in a sheet**
+
+```bash
+./drivectl sheets update-range <spreadsheet-id> <value> --sheet <sheet-name> --range <A1-notation>
+```
+
+**List tabs in a document**
+
+```bash
+./drivectl docs tabs <document-id>
+```
+
+
 ## MCP Server Mode
 
 `drivectl` can also be run as an MCP server, exposing its commands as tools that can be called by an MCP client.
@@ -142,6 +175,12 @@ mcptools call list ./drivectl --mcp
 # Get a file
 mcptools call get -p '{"file-id": "<your-file-id>"}' ./drivectl --mcp
 ```
+
+## Gemini CLI Configuration
+
+This repository contains a sample `settings.json.sample` file. To use this tool with the Gemini CLI, you should copy this file to `.gemini/settings.json` in your project root and replace the placeholder values with your actual credentials.
+
+
 
 # Disclaimer
 

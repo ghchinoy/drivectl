@@ -1,18 +1,4 @@
 
-// Copyright 2025 Google LLC
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package cmd
 
 import (
@@ -26,6 +12,7 @@ import (
 	"google.golang.org/api/docs/v1"
 	googledrive "google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
+	"google.golang.org/api/sheets/v4"
 )
 
 var (
@@ -35,6 +22,8 @@ var (
 	driveSvc *googledrive.Service
 	// docsSvc is the Google Docs service client.
 	docsSvc *docs.Service
+	// sheetsSvc is the Google Sheets service client.
+	sheetsSvc *sheets.Service
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -64,6 +53,11 @@ Google Docs, including exporting to multiple formats and accessing individual ta
 		docsSvc, err = docs.NewService(ctx, option.WithHTTPClient(client))
 		if err != nil {
 			return fmt.Errorf("could not create docs service: %w", err)
+		}
+
+		sheetsSvc, err = sheets.NewService(ctx, option.WithHTTPClient(client))
+		if err != nil {
+			return fmt.Errorf("could not create sheets service: %w", err)
 		}
 		return nil
 	},

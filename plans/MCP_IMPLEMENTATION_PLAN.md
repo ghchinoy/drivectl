@@ -53,30 +53,62 @@ The new architecture will be as follows:
 - [x] Implement the logic to start the server on HTTP (`--mcp-http`).
 - [x] Refactor the code to abstract the Drive and Docs APIs into an `internal/` package.
 
-### Phase 3: Testing and Verification
+### Phase 3: Cobra Command Implementation
 
-- [x] Execute the manual test plan in `plans/mcp_test_plan.md`.
-- [x] **Regression Testing:**
-    - [x] Verify that the existing CLI functionality is unaffected.
-- [x] **MCP Stdio Mode Testing:**
-    - [x] Test listing tools.
-    - [x] Test calling tools with and without arguments.
-- [x] **MCP HTTP Mode Testing:**
-    - [x] Test listing tools.
-    - [x] Test calling tools with and without arguments.
-- [x] **Error Handling Testing:**
-    - [x] Test calling tools with invalid arguments.
-    - [x] Test calling non-existent tools.
+- [x] Create a new file `cmd/sheets.go` and add the `sheets` command with its subcommands (`list`, `get`, `get-range`, `update-range`).
+- [x] Create a new file `cmd/docs.go` and move the `tabs` command under a new `docs` subcommand.
+- [x] Update the `root.go` file to add the new `sheets` and `docs` commands.
+- [x] Implement the `RunE` functions for these commands to call the functions in `internal/drive/sheets.go` and `internal/drive/drive.go`.
 
-### Phase 4: Documentation and Cleanup
+### Phase 4: MCP Integration
 
-- [ ] Update the `README.md` to document the new MCP server functionality.
-- [ ] Review and refactor the code for clarity and maintainability.
-- [x] Add Go doc comments to all the methods.
-- [x] Make sure the long command descriptions are being used in `mcp/server.go`.
-- [x] Add a new MCP resource with a cheat sheet of Drive query examples.
+- [x] Add new tool handlers in `mcp/server.go` for the new `sheets` and `docs` commands, using the `.` notation for the tool names (e.g., `sheets.list`).
+- [x] Define the `Args` structs for the new tools.
+- [x] Implement the tool handlers to call the functions in `internal/drive/sheets.go`.
+- [x] Add a new MCP resource that provides an explanation of A1 notation.
 
-## 3. Lessons Learned
+
+### Phase 5: Documentation and Testing
+
+
+- [x] Create a new `sheets_test_plan.md` file with manual test cases for the new functionality.
+- [x] Update the `README.md` file to document the new `sheets` and `docs` commands.
+- [x] Update this `MCP_IMPLEMENTATION_PLAN.md` file with the current status.
+- [x] Create a `.commit.txt` file with a summary of the changes.
+
+## 3. Guide: Creating MCP Servers from Cobra CLIs
+
+Integrating a Cobra-based command-line tool with the MCP Go SDK is a powerful way to expose your CLI's functionality to other programs. This guide provides a set of best practices and lessons learned from the implementation of the `drivectl` MCP server.
+
+### 1. Core Principle: Decouple Logic from UI
+
+The most important principle is to decouple your core application logic from your command-line interface (CLI) code.
+
+**Don't:** Put your API call logic directly inside your Cobra `RunE` functions.
+
+**Do:** Create a separate package (e.g., `internal/applogic`) that contains all the core functionality. Your Cobra commands and your MCP tool handlers should both call into this package.
+
+**Benefits:**
+*   **Reusability:** The same core logic can be used by the CLI and the MCP server.
+*   **Testability:** The core logic can be tested independently of the CLI.
+*   **Maintainability:** The code is cleaner, more modular, and easier to understand.
+
+### 2. Structuring Your MCP Server
+
+The `mcp/server.go` file is the heart of your MCP server. Here's a good way to structure it:
+
+*   **Service Initializers:** Create separate functions (e.g., `getDriveSvc`, `getDocsSvc`) to initialize your API services. These functions should handle authentication and client creation.
+*   **Argument Structs:** For each MCP tool, define a struct that represents its arguments (e.g., `ListArgs`, `GetArgs`). Use JSON tags to map the struct fields to the JSON parameters that the MCP client will send.
+*   **Tool Handlers:** The tool handlers are the functions that are executed when an MCP client calls a tool. They should be responsible for:
+    1.  Parsing the arguments from the `params` object.
+    2.  Calling the appropriate function in your core logic package.
+    3.  Formatting the result and returning it in a `mcp.CallToolResultFor` struct.
+
+### 3. Mapping Cobra Commands to MCP Tools
+
+A common pattern is to iterate through your Cobra commands and create a corresponding MCP tool for each one.
+
+*   **Subcommands:** For commands with subcommands (like `drivectl sheets list`), use a `.` separator in the MCP tool name to create a 
 
 ### Cobra and MCP Integration: A Deep Dive
 
@@ -185,3 +217,4 @@ The `mcp-go` SDK has some nuances that are important to be aware of:
 *   **`mcptools` limitations:** The `mcptools` CLI is a useful tool for testing MCP servers, but it has some limitations. For example, it doesn't have a flag to specify the server address for the HTTP transport, and it expects the `content` field in the tool result to be an array.
 
 By following these lessons learned, developers can more easily integrate their Cobra-based command-line tools with the MCP Go SDK and build powerful, flexible MCP servers.
+

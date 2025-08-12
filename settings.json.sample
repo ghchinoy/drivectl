@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "drive": {
+      "command": "drivectl",
+      "args": ["--mcp"],
+      "env": {
+        "DRIVE_SECRETS": "YOUR_CLIENT_SECRET.json"
+      }
+    }
+  }
+}
