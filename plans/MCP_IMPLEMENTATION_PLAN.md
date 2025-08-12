@@ -55,17 +55,24 @@ The new architecture will be as follows:
 
 ### Phase 3: Cobra Command Implementation
 
-- [ ] Create a new file `cmd/sheets.go` and add the `sheets` command with its subcommands (`list`, `get`, `get-range`). The `list` subcommand will be an alias for `drivectl list -q "mimeType='application/vnd.google-apps.spreadsheet'"`.
-- [ ] Create a new file `cmd/docs.go` and move the `tabs` command under a new `docs` subcommand. Add a `list` subcommand to `docs` as an alias for `drivectl list -q "mimeType='application/vnd.google-apps.document'"`.
-- [ ] Update the `root.go` file to add the new `sheets` and `docs` commands.
-- [ ] Implement the `RunE` functions for these commands to call the functions in `internal/drive/sheets.go` and `internal/drive/drive.go`.
+- [x] Create a new file `cmd/sheets.go` and add the `sheets` command with its subcommands (`list`, `get`, `get-range`, `update-range`).
+- [x] Create a new file `cmd/docs.go` and move the `tabs` command under a new `docs` subcommand.
+- [x] Update the `root.go` file to add the new `sheets` and `docs` commands.
+- [x] Implement the `RunE` functions for these commands to call the functions in `internal/drive/sheets.go` and `internal/drive/drive.go`.
 
 ### Phase 4: MCP Integration
 
-- [ ] Add new tool handlers in `mcp/server.go` for the new `sheets` and `docs` commands, using the `.` notation for the tool names (e.g., `sheets.list`).
-- [ ] Define the `Args` structs for the new tools.
-- [ ] Implement the tool handlers to call the functions in `internal/drive/sheets.go`.
-- [ ] Add a new MCP resource that provides an explanation of A1 notation.
+- [x] Add new tool handlers in `mcp/server.go` for the new `sheets` and `docs` commands, using the `.` notation for the tool names (e.g., `sheets.list`).
+- [x] Define the `Args` structs for the new tools.
+- [x] Implement the tool handlers to call the functions in `internal/drive/sheets.go`.
+- [x] Add a new MCP resource that provides an explanation of A1 notation.
+
+### Phase 5: Documentation and Testing
+
+- [x] Create a new `sheets_test_plan.md` file with manual test cases for the new functionality.
+- [x] Update the `README.md` file to document the new `sheets` and `docs` commands.
+- [x] Update this `MCP_IMPLEMENTATION_PLAN.md` file with the current status.
+- [x] Create a `.commit.txt` file with a summary of the changes.
 
 ## 3. Lessons Learned
 

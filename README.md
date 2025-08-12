@@ -99,6 +99,38 @@ The `--query` (`-q`) flag uses the Google Drive API's query language. You can bu
 ./drivectl get <pdf-file-id> -o my-file.pdf
 ```
 
+### Google Sheets and Docs
+
+**List sheets in a spreadsheet**
+
+```bash
+./drivectl sheets list <spreadsheet-id>
+```
+
+**Get a sheet as CSV**
+
+```bash
+./drivectl sheets get <spreadsheet-id> --sheet <sheet-name>
+```
+
+**Get a specific range from a sheet**
+
+```bash
+./drivectl sheets get-range <spreadsheet-id> --sheet <sheet-name> --range <A1-notation>
+```
+
+**Update a specific range in a sheet**
+
+```bash
+./drivectl sheets update-range <spreadsheet-id> <value> --sheet <sheet-name> --range <A1-notation>
+```
+
+**List tabs in a document**
+
+```bash
+./drivectl docs tabs <document-id>
+```
+
 ## MCP Server Mode
 
 `drivectl` can also be run as an MCP server, exposing its commands as tools that can be called by an MCP client.
