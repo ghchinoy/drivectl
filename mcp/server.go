@@ -381,10 +381,14 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 							return nil, fmt.Errorf("unable to get sheet range: %w", err)
 						}
 
-						// TODO: format values
+						jsonValues, err := json.Marshal(values)
+						if err != nil {
+							return nil, fmt.Errorf("unable to marshal values to json: %w", err)
+						}
+
 						return &mcp.CallToolResultFor[any]{
 							Content: []mcp.Content{
-								&mcp.TextContent{Text: fmt.Sprintf("%v", values)},
+								&mcp.TextContent{Text: string(jsonValues)},
 							},
 						}, nil
 					})
