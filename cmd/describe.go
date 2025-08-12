@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/ghchinoy/drivectl/internal/drive"
 	"github.com/spf13/cobra"
 )
 
@@ -30,9 +31,9 @@ var describeCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fileId := args[0]
 
-		file, err := driveSvc.Files.Get(fileId).Fields("*").Do()
+		file, err := drive.DescribeFile(driveSvc, fileId)
 		if err != nil {
-			return fmt.Errorf("unable to retrieve file: %w", err)
+			return err
 		}
 
 		jsonFile, err := json.MarshalIndent(file, "", "  ")

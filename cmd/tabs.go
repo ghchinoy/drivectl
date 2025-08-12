@@ -17,6 +17,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/ghchinoy/drivectl/internal/drive"
 	"github.com/spf13/cobra"
 )
 
@@ -28,17 +29,17 @@ var tabsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		documentId := args[0]
 
-		doc, err := docsSvc.Documents.Get(documentId).IncludeTabsContent(true).Do()
+		tabs, err := drive.GetTabs(docsSvc, documentId)
 		if err != nil {
-			return fmt.Errorf("unable to retrieve document with tabs: %w", err)
+			return err
 		}
 
 		fmt.Println("Tabs:")
-		if len(doc.Tabs) == 0 {
+		if len(tabs) == 0 {
 			fmt.Println("No tabs found.")
 		} else {
-			for i := range doc.Tabs {
-				fmt.Printf("Tab %d\n", i)
+			for _, tab := range tabs {
+				fmt.Println(tab)
 			}
 		}
 		return nil

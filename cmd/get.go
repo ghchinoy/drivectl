@@ -16,12 +16,10 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
-	"strings"
 
+	"github.com/ghchinoy/drivectl/internal/drive"
 	"github.com/spf13/cobra"
-	"google.golang.org/api/docs/v1"
 )
 
 var (
@@ -29,35 +27,6 @@ var (
 	format     string
 	tabIndex   int
 )
-
-// renderBodyAsText converts a Google Docs Body object to a plain text string.
-func renderBodyAsText(body *docs.Body) string {
-	var text strings.Builder
-	if body == nil || body.Content == nil {
-		return ""
-	}
-	for _, element := range body.Content {
-		if element.Paragraph != nil {
-			for _, pElem := range element.Paragraph.Elements {
-				if pElem.TextRun != nil {
-					text.WriteString(pElem.TextRun.Content)
-				}
-			}
-		}
-	}
-	return text.String()
-}
-
-var formatMap = map[string]string{
-	"pdf":      "application/pdf",
-	"docx":     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-	"html":     "text/html",
-	"zip":      "application/zip",
-	"epub":     "application/epub+zip",
-	"txt":      "text/plain",
-	"md":       "text/markdown",
-	"markdown": "text/markdown",
-}
 
 var getCmd = &cobra.Command{
 	Use:   "get [fileId]",
@@ -70,82 +39,17 @@ It can also extract the plain text content of a single tab from a Google Doc usi
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fileId := args[0]
 
-		// If a tab index is specified, we must use the Docs API.
-		if tabIndex >= 0 {
-			doc, err := docsSvc.Documents.Get(fileId).IncludeTabsContent(true).Do()
-			if err != nil {
-				return fmt.Errorf("unable to retrieve document with tabs: %w", err)
-			}
-
-			if tabIndex >= len(doc.Tabs) {
-				return fmt.Errorf("invalid tab index: %d. Document only has %d tabs", tabIndex, len(doc.Tabs))
-			}
-
-			theTab := doc.Tabs[tabIndex]
-			textContent := renderBodyAsText(theTab.DocumentTab.Body)
-			content := []byte(textContent)
-
-			if outputFile != "" {
-				err := os.WriteFile(outputFile, content, 0644)
-				if err != nil {
-					return fmt.Errorf("failed to write to output file %s: %w", outputFile, err)
-				}
-				fmt.Printf("Successfully saved tab %d to %s\n", tabIndex, outputFile)
-			} else {
-				fmt.Println(string(content))
-			}
-			return nil
-		}
-
-		// Default behavior: use the Drive API for direct export or download.
-		file, err := driveSvc.Files.Get(fileId).Fields("mimeType", "name").Do()
+		content, err := drive.GetFile(driveSvc, docsSvc, fileId, format, tabIndex)
 		if err != nil {
-			return fmt.Errorf("unable to retrieve file metadata: %w", err)
-		}
-
-		var content []byte
-
-		if file.MimeType == "application/vnd.google-apps.document" {
-			exportMimeType, ok := formatMap[strings.ToLower(format)]
-			if !ok && format != "" {
-				return fmt.Errorf("invalid format for Google Doc: %s. Valid formats are: pdf, docx, html, zip, epub, txt, md", format)
-			}
-			if exportMimeType == "" {
-				exportMimeType = "text/plain" // Default to plain text
-			}
-
-			resp, err := driveSvc.Files.Export(fileId, exportMimeType).Download()
-			if err != nil {
-				return fmt.Errorf("unable to export Google Doc: %w", err)
-			}
-			defer resp.Body.Close()
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return fmt.Errorf("unable to read exported content: %w", err)
-			}
-			content = body
-		} else {
-			// It's a regular file, download it directly
-			resp, err := driveSvc.Files.Get(fileId).Download()
-			if err != nil {
-				return fmt.Errorf("unable to download file: %w", err)
-			}
-			defer resp.Body.Close()
-
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return fmt.Errorf("unable to read file content: %w", err)
-			}
-			content = body
+			return err
 		}
 
 		if outputFile != "" {
 			err := os.WriteFile(outputFile, content, 0644)
 			if err != nil {
-				return fmt.Errorf("failed to write to output file %s: %w", outputFile, err)
+				return fmt.Errorf("failed to write to output file %s: %%w", outputFile, err)
 			}
-			fmt.Printf("Successfully saved file to %s\n", outputFile)
+			fmt.Printf("Successfully saved file to %%s\n", outputFile)
 		} else {
 			// For binary formats like pdf, docx, etc., printing to console is not useful.
 			// We will just print a success message instead.
