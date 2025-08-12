@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -32,7 +31,7 @@ import (
 
 // newOAuthClient creates a new HTTP client with OAuth 2.0 authentication.
 func newOAuthClient(ctx context.Context, secretFile string, noBrowserAuth bool) (*http.Client, error) {
-	b, err := ioutil.ReadFile(secretFile)
+	b, err := os.ReadFile(secretFile)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read client secret file: %v", err)
 	}

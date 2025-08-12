@@ -98,3 +98,8 @@ The `--query` (`-q`) flag uses the Google Drive API's query language. You can bu
 # Download a regular file (e.g., a PDF)
 ./drivectl get <pdf-file-id> -o my-file.pdf
 ```
+
+
+# Disclaimer
+
+This is not an officially supported Google product.

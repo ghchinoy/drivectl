@@ -43,8 +43,6 @@ var tabsCmd = &cobra.Command{
 		}
 		return nil
 	},
-
-
 }
 
 func init() {
