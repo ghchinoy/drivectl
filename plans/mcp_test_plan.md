@@ -47,13 +47,13 @@ This document outlines the manual test cases to verify the MCP server functional
 - [x] **Verification:**
     - [x] Are all the `drivectl` commands listed as available tools?
 - [x] **Action:** Call the `list` tool with `curl`.
-- [x] **Verification:** Is the output a valid JSON response containing a list of your Drive files?
+- [x] **Verification:** Is the output a valid JSON response containing a list of your Drive files? (**Status:** Passing)
 - [x] **Action:** Call the `get` tool with a file ID with `curl`.
-- [x] **Verification:** Does the tool return the content of the file?
+- [x] **Verification:** Does the tool return the content of the file? (**Status:** Passing)
 - [x] **Action:** Call the `describe` tool with a file ID with `curl`.
-- [x] **Verification:** Does the tool return the file metadata?
-- [ ] **Action:** Call the `tabs` tool with a document ID with `curl`.
-- [ ] **Verification:** Does the tool return the list of tabs?
+- [x] **Verification:** Does the tool return the file metadata? (**Status:** Passing)
+- [x] **Action:** Call the `tabs` tool with a document ID with `curl`.
+- [x] **Verification:** Does the tool return the list of tabs? (**Status:** Passing with expected error for non-doc files)
 
 ---
 
@@ -68,8 +68,8 @@ This document outlines the manual test cases to verify the MCP server functional
 
 ### Test Case 5: MCP Resource Testing
 
-- [ ] **Action:** Add a new resource to the MCP server that provides a cheat sheet of Drive query examples.
-- [ ] **Action:** Use `mcptools resources ./drivectl --mcp` to list the available resources.
-- [ ] **Verification:** Is the new resource listed?
-- [ ] **Action:** Use `mcptools read-resource <resource-name> ./drivectl --mcp` to read the resource.
-- [ ] **Verification:** Is the content of the resource correct?
+- [x] **Action:** Add a new resource to the MCP server that provides a cheat sheet of Drive query examples.
+- [x] **Action:** Use `mcptools resources ./drivectl --mcp` to list the available resources.
+- [x] **Verification:** Is the new resource listed?
+- [x] **Action:** Use `mcptools read-resource embedded:drive-query-cheat-sheet ./drivectl --mcp` to read the resource.
+- [x] **Verification:** Is the content of the resource correct?
