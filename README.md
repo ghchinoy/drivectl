@@ -131,6 +131,7 @@ The `--query` (`-q`) flag uses the Google Drive API's query language. You can bu
 ./drivectl docs tabs <document-id>
 ```
 
+
 ## MCP Server Mode
 
 `drivectl` can also be run as an MCP server, exposing its commands as tools that can be called by an MCP client.
@@ -178,6 +179,7 @@ mcptools call get -p '{"file-id": "<your-file-id>"}' ./drivectl --mcp
 ## Gemini CLI Configuration
 
 This repository contains a sample `settings.json.sample` file. To use this tool with the Gemini CLI, you should copy this file to `.gemini/settings.json` in your project root and replace the placeholder values with your actual credentials.
+
 
 
 # Disclaimer
