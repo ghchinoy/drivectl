@@ -74,7 +74,7 @@ The new architecture will be as follows:
 - [ ] Review and refactor the code for clarity and maintainability.
 - [x] Add Go doc comments to all the methods.
 - [x] Make sure the long command descriptions are being used in `mcp/server.go`.
-- [ ] Add a new MCP resource with a cheat sheet of Drive query examples.
+- [x] Add a new MCP resource with a cheat sheet of Drive query examples.
 
 ## 3. Lessons Learned
 
