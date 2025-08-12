@@ -33,7 +33,7 @@ A command-line tool for interacting with the Google Drive API.
 8.  Give it a name (e.g., "drivectl").
 9.  Click **Create**. A window will appear with your client ID and client secret. Click **Download JSON**.
 10. Rename the downloaded file to `client_secret.json`.
-11. Place this file in a secure location. By default, `drivectl` looks for it at `~/secrets/client_google-drive-api_ghchinoy-genai-blackbelt-fishfooding.json`, but you can specify a different path using the `--secret-file` flag.
+11. Place this file in a secure location. You will need to provide the path to this file using the `--secret-file` flag or by setting the `DRIVE_SECRETS` environment variable.
 
 ## Usage
 

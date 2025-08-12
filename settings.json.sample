@@ -1,10 +1,11 @@
 {
-  "//": "This is a sample settings file for the Gemini CLI.",
-  "//": "Copy this file to .gemini/settings.json and fill in your values.",
-  "credentials": {
-    "apiKey": "YOUR_API_KEY"
-  },
-  "codeCompletion": {
-    "enabled": true
+  "mcpServers": {
+    "drive": {
+      "command": "drivectl",
+      "args": ["--mcp"],
+      "env": {
+        "DRIVE_SECRETS": "YOUR_CLIENT_SECRET.json"
+      }
+    }
   }
 }

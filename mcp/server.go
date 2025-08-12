@@ -144,27 +144,29 @@ type UpdateSheetRangeArgs struct {
 // driveQueryCheatSheetHandler is a resource handler that returns a cheat sheet of Drive query examples.
 func driveQueryCheatSheetHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.ReadResourceParams) (*mcp.ReadResourceResult, error) {
 	return &mcp.ReadResourceResult{
-		Contents: []*mcp.ResourceContents{
-			{
-				URI:      params.URI,
-				MIMEType: "text/plain",
-				Text:     driveQueryCheatSheet,
+			Contents: []*mcp.ResourceContents{
+				{
+					URI:      params.URI,
+					MIMEType: "text/plain",
+					Text:     driveQueryCheatSheet,
+				},
 			},
 		},
-	},
+		nil
 }
 
 // a1NotationCheatSheetHandler is a resource handler that returns a cheat sheet of A1 notation examples.
 func a1NotationCheatSheetHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.ReadResourceParams) (*mcp.ReadResourceResult, error) {
 	return &mcp.ReadResourceResult{
-		Contents: []*mcp.ResourceContents{
-			{
-				URI:      params.URI,
-				MIMEType: "text/plain",
-				Text:     a1NotationCheatSheet,
+			Contents: []*mcp.ResourceContents{
+				{
+					URI:      params.URI,
+					MIMEType: "text/plain",
+					Text:     a1NotationCheatSheet,
+				},
 			},
 		},
-	},
+		nil
 }
 
 // Start starts the MCP server.
@@ -283,20 +285,20 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 						}
 
 						docsSvc, err := getDocsSvc(ctx)
-							if err != nil {
-								return nil, err
-							}
+						if err != nil {
+							return nil, err
+						}
 
 						tabs, err := drive.GetTabs(docsSvc, params.Arguments.DocumentID)
-							if err != nil {
-								return nil, fmt.Errorf("unable to get tabs: %w", err)
-							}
+						if err != nil {
+							return nil, fmt.Errorf("unable to get tabs: %w", err)
+						}
 
-							return &mcp.CallToolResultFor[any]{
-								Content: []mcp.Content{
-									&mcp.TextContent{Text: strings.Join(tabs, "\n")},
-								},
-							}, nil
+						return &mcp.CallToolResultFor[any]{
+							Content: []mcp.Content{
+								&mcp.TextContent{Text: strings.Join(tabs, "\n")},
+							},
+						}, nil
 					})
 				}
 			}
@@ -313,20 +315,20 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 							return nil, fmt.Errorf("spreadsheet-id is a required argument")
 						}
 						sheetsSvc, err := getSheetsSvc(ctx)
-							if err != nil {
-								return nil, err
-							}
+						if err != nil {
+							return nil, err
+						}
 
 						sheets, err := drive.ListSheets(sheetsSvc, params.Arguments.SpreadsheetID)
-							if err != nil {
-								return nil, fmt.Errorf("unable to list sheets: %w", err)
-							}
+						if err != nil {
+							return nil, fmt.Errorf("unable to list sheets: %w", err)
+						}
 
-							return &mcp.CallToolResultFor[any]{
-								Content: []mcp.Content{
-									&mcp.TextContent{Text: strings.Join(sheets, "\n")},
-								},
-							}, nil
+						return &mcp.CallToolResultFor[any]{
+							Content: []mcp.Content{
+								&mcp.TextContent{Text: strings.Join(sheets, "\n")},
+							},
+						}, nil
 					})
 				case "get":
 					mcp.AddTool(server, &mcp.Tool{
@@ -340,20 +342,20 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 							return nil, fmt.Errorf("sheet-name is a required argument")
 						}
 						sheetsSvc, err := getSheetsSvc(ctx)
-							if err != nil {
-								return nil, err
-							}
+						if err != nil {
+							return nil, err
+						}
 
-							csv, err := drive.GetSheetAsCSV(sheetsSvc, params.Arguments.SpreadsheetID, params.Arguments.SheetName)
-							if err != nil {
-								return nil, fmt.Errorf("unable to get sheet as csv: %w", err)
-							}
+						csv, err := drive.GetSheetAsCSV(sheetsSvc, params.Arguments.SpreadsheetID, params.Arguments.SheetName)
+						if err != nil {
+							return nil, fmt.Errorf("unable to get sheet as csv: %w", err)
+						}
 
-							return &mcp.CallToolResultFor[any]{
-								Content: []mcp.Content{
-									&mcp.TextContent{Text: csv},
-								},
-							}, nil
+						return &mcp.CallToolResultFor[any]{
+							Content: []mcp.Content{
+								&mcp.TextContent{Text: csv},
+							},
+						}, nil
 					})
 				case "get-range":
 					mcp.AddTool(server, &mcp.Tool{
@@ -370,21 +372,21 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 							return nil, fmt.Errorf("range is a required argument")
 						}
 						sheetsSvc, err := getSheetsSvc(ctx)
-							if err != nil {
-								return nil, err
-							}
+						if err != nil {
+							return nil, err
+						}
 
-							values, err := drive.GetSheetRange(sheetsSvc, params.Arguments.SpreadsheetID, params.Arguments.SheetName, params.Arguments.Range)
-							if err != nil {
-								return nil, fmt.Errorf("unable to get sheet range: %w", err)
-							}
+						values, err := drive.GetSheetRange(sheetsSvc, params.Arguments.SpreadsheetID, params.Arguments.SheetName, params.Arguments.Range)
+						if err != nil {
+							return nil, fmt.Errorf("unable to get sheet range: %w", err)
+						}
 
-							// TODO: format values
-							return &mcp.CallToolResultFor[any]{
-								Content: []mcp.Content{
-									&mcp.TextContent{Text: fmt.Sprintf("%v", values)},
-								},
-							}, nil
+						// TODO: format values
+						return &mcp.CallToolResultFor[any]{
+							Content: []mcp.Content{
+								&mcp.TextContent{Text: fmt.Sprintf("%v", values)},
+							},
+						}, nil
 					})
 				case "update-range":
 					mcp.AddTool(server, &mcp.Tool{
@@ -404,21 +406,21 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 							return nil, fmt.Errorf("value is a required argument")
 						}
 						sheetsSvc, err := getSheetsSvc(ctx)
-							if err != nil {
-								return nil, err
-							}
+						if err != nil {
+							return nil, err
+						}
 
-							values := [][]interface{}{{params.Arguments.Value}}
-							err = drive.UpdateSheetRange(sheetsSvc, params.Arguments.SpreadsheetID, params.Arguments.SheetName, params.Arguments.Range, values)
-							if err != nil {
-								return nil, fmt.Errorf("unable to update sheet range: %w", err)
-							}
+						values := [][]interface{}{{params.Arguments.Value}}
+						err = drive.UpdateSheetRange(sheetsSvc, params.Arguments.SpreadsheetID, params.Arguments.SheetName, params.Arguments.Range, values)
+						if err != nil {
+							return nil, fmt.Errorf("unable to update sheet range: %w", err)
+						}
 
-							return &mcp.CallToolResultFor[any]{
-								Content: []mcp.Content{
-									&mcp.TextContent{Text: "Sheet updated successfully."},
-								},
-							}, nil
+						return &mcp.CallToolResultFor[any]{
+							Content: []mcp.Content{
+								&mcp.TextContent{Text: "Sheet updated successfully."},
+							},
+						}, nil
 					})
 				}
 			}
