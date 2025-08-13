@@ -23,6 +23,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	addTabTitle        string
+	addTabMarkdownFile string
+)
+
 var docsCmd = &cobra.Command{
 	Use:   "docs",
 	Short: "Interact with Google Docs",
