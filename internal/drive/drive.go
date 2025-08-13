@@ -178,3 +178,5 @@ func GetTabs(docsSvc *docs.Service, documentId string) ([]*TabInfo, error) {
 
 	return buildTabs(doc.Tabs, 0), nil
 }
+
+

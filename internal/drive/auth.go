@@ -23,7 +23,7 @@ func NewOAuthClient(ctx context.Context, secretFile string, noBrowserAuth bool) 
 		return nil, fmt.Errorf("unable to read client secret file: %v", err)
 	}
 
-	config, err := google.ConfigFromJSON(b, drive.DriveReadonlyScope, docs.DocumentsReadonlyScope, sheets.SpreadsheetsScope)
+	config, err := google.ConfigFromJSON(b, drive.DriveReadonlyScope, docs.DocumentsReadonlyScope, sheets.SpreadsheetsScope, drive.DriveFileScope)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse client secret file to config: %v", err)
 	}

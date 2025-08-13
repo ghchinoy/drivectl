@@ -64,8 +64,11 @@ This is the most critical and complex part of the implementation. It will be a n
 ## 4. Implementation Phases
 
 1.  **Phase 1: The Converter**
-    *   Choose a Markdown parsing library.
-    *   Implement the core Markdown-to-Docs-JSON converter in `internal/drive`. Start with basic elements (headings, paragraphs, bold, italic) and expand from there.
+    *   **Research and Decision:**
+        *   **Google Drive API `files.create`:** We will first test if the Google Drive API can convert Markdown to a Google Doc by setting the source MIME type to `text/markdown` and the destination MIME type to `application/vnd.google-apps.document`. This would be the simplest solution if it works.
+        *   **Markdown Parsing Library:** If the direct conversion is not possible, we will use a Go library to parse the Markdown into an Abstract Syntax Tree (AST). The `goldmark` library is the leading candidate due to its CommonMark compliance, extensibility, and performance.
+    *   **Implementation:**
+        *   Implement the core Markdown-to-Docs-JSON converter in `internal/drive`. This will involve traversing the AST and building the corresponding Google Docs JSON structure. We will start with basic elements (headings, paragraphs, bold, italic) and expand from there.
 2.  **Phase 2: Create New Doc**
     *   Implement the `docs.create` CLI command and MCP tool.
     *   This will be the first real-world test of the converter.

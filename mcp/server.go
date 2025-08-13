@@ -401,36 +401,7 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 					mcp.AddTool(server, &mcp.Tool{
 						Name:        "sheets.update-range",
 						Description: subCommand.Long,
-					}, func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[UpdateSheetRangeArgs]) (*mcp.CallToolResultFor[any], error) {
-						if params.Arguments.SpreadsheetID == "" {
-							return nil, fmt.Errorf("spreadsheet-id is a required argument")
-						}
-						if params.Arguments.SheetName == "" {
-							return nil, fmt.Errorf("sheet-name is a required argument")
-						}
-						if params.Arguments.Range == "" {
-							return nil, fmt.Errorf("range is a required argument")
-						}
-						if params.Arguments.Value == "" {
-							return nil, fmt.Errorf("value is a required argument")
-						}
-						sheetsSvc, err := getSheetsSvc(ctx)
-						if err != nil {
-							return nil, err
-						}
-
-						values := [][]interface{}{{params.Arguments.Value}}
-						err = drive.UpdateSheetRange(sheetsSvc, params.Arguments.SpreadsheetID, params.Arguments.SheetName, params.Arguments.Range, values)
-						if err != nil {
-							return nil, fmt.Errorf("unable to update sheet range: %w", err)
-						}
-
-						return &mcp.CallToolResultFor[any]{
-							Content: []mcp.Content{
-								&mcp.TextContent{Text: "Sheet updated successfully."},
-							},
-						}, nil
-					})
+					}, updateRangeHandler)
 				}
 			}
 		}
@@ -473,4 +444,35 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 	}
 
 	return nil
+}
+
+func updateRangeHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[UpdateSheetRangeArgs]) (*mcp.CallToolResultFor[any], error) {
+	if params.Arguments.SpreadsheetID == "" {
+		return nil, fmt.Errorf("spreadsheet-id is a required argument")
+	}
+	if params.Arguments.SheetName == "" {
+		return nil, fmt.Errorf("sheet-name is a required argument")
+	}
+	if params.Arguments.Range == "" {
+		return nil, fmt.Errorf("range is a required argument")
+	}
+	if params.Arguments.Value == "" {
+		return nil, fmt.Errorf("value is a required argument")
+	}
+	sheetsSvc, err := getSheetsSvc(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	values := [][]interface{}{{params.Arguments.Value}}
+	err = drive.UpdateSheetRange(sheetsSvc, params.Arguments.SpreadsheetID, params.Arguments.SheetName, params.Arguments.Range, values)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update sheet range: %w", err)
+	}
+
+	return &mcp.CallToolResultFor[any]{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: "Sheet updated successfully."},
+		},
+	}, nil
 }
