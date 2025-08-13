@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -115,6 +116,13 @@ type TabsArgs struct {
 	DocumentID string `json:"document-id"`
 }
 
+// DocsCreateArgs defines the arguments for the docs create tool.
+type DocsCreateArgs struct {
+	Title        string `json:"title"`
+	MarkdownFile string `json:"markdown_file,omitempty"`
+	MarkdownText string `json:"markdown_text,omitempty"`
+}
+
 // ListSheetsArgs defines the arguments for the sheets list tool.
 type ListSheetsArgs struct {
 	SpreadsheetID string `json:"spreadsheet-id"`
@@ -199,6 +207,11 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 						Name:        "docs.tabs",
 						Description: subCommand.Long,
 					}, docsTabsHandler)
+				case "create":
+					mcp.AddTool(server, &mcp.Tool{
+						Name:        "docs.create",
+						Description: subCommand.Long,
+					}, docsCreateHandler)
 				}
 			}
 		case "sheets":
@@ -385,6 +398,46 @@ func docsTabsHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.Cal
 	return &mcp.CallToolResultFor[any]{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: strings.Join(tabStrings, "\n")},
+		},
+	}, nil
+}
+
+// docsCreateHandler is the handler for the docs create tool.
+func docsCreateHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[DocsCreateArgs]) (*mcp.CallToolResultFor[any], error) {
+	if params.Arguments.Title == "" {
+		return nil, fmt.Errorf("title is a required argument")
+	}
+	if params.Arguments.MarkdownFile == "" && params.Arguments.MarkdownText == "" {
+		return nil, fmt.Errorf("either markdown_file or markdown_text is required")
+	}
+	if params.Arguments.MarkdownFile != "" && params.Arguments.MarkdownText != "" {
+		return nil, fmt.Errorf("only one of markdown_file or markdown_text can be provided")
+	}
+
+	var markdownContent string
+	if params.Arguments.MarkdownFile != "" {
+		content, err := ioutil.ReadFile(params.Arguments.MarkdownFile)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read markdown file: %w", err)
+		}
+		markdownContent = string(content)
+	} else {
+		markdownContent = params.Arguments.MarkdownText
+	}
+
+	docsSvc, err := getDocsSvc(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	doc, err := drive.CreateDocFromMarkdown(docsSvc, params.Arguments.Title, markdownContent)
+	if err != nil {
+		return nil, err
+	}
+
+	return &mcp.CallToolResultFor[any]{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: fmt.Sprintf("Successfully created document %s (%s)", doc.Title, doc.DocumentId)},
 		},
 	}, nil
 }
