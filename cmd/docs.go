@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"strings"
 
 	"github.com/ghchinoy/drivectl/internal/drive"
@@ -60,7 +61,32 @@ var docsTabsCmd = &cobra.Command{
 	},
 }
 
+var docsCreateCmd = &cobra.Command{
+	Use:   "create [title] [markdown-file]",
+	Short: "Creates a new Google Doc from a Markdown file.",
+	Long:  `Creates a new Google Doc from a Markdown file.`,
+	Args:  cobra.ExactArgs(2),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		title := args[0]
+		markdownFile := args[1]
+
+		content, err := ioutil.ReadFile(markdownFile)
+		if err != nil {
+			return fmt.Errorf("unable to read markdown file: %w", err)
+		}
+
+		doc, err := drive.CreateDocFromMarkdown(docsSvc, title, string(content))
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Successfully created document %s (%s)\n", doc.Title, doc.DocumentId)
+		return nil
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(docsCmd)
 	docsCmd.AddCommand(docsTabsCmd)
+	docsCmd.AddCommand(docsCreateCmd)
 }

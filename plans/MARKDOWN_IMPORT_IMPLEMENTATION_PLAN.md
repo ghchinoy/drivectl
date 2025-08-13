@@ -89,3 +89,14 @@ Before committing to building a complex parser, we tested a simpler approach bas
 *   **Test:** We implemented a temporary `test-md-import` command to perform this exact operation.
 *   **Result:** The test created a new Google Doc, but the content was the raw, unformatted Markdown text. The Drive API did not perform any conversion of the formatting.
 *   **Conclusion:** This experiment definitively proved that there is no built-in, automatic conversion for Markdown in the Drive or Docs APIs. Our initial plan to build a custom "Markdown to Google Docs JSON" converter is the correct and necessary path forward.
+
+### Converter Implementation Strategy
+
+The process of converting a Markdown AST to a series of Google Docs API requests is complex. A naive approach of walking the AST and generating requests on the fly proved to be brittle, especially for handling nested styles and paragraph-level formatting.
+
+*   **Initial Approach:** The first implementation attempted to create `InsertText` and `Update...Style` requests in a single pass of the AST.
+*   **Problem:** This led to incorrect styling, such as heading styles being applied to the entire document, because the ranges for the style updates were not being calculated correctly.
+*   **Revised Strategy:** A more robust approach is to:
+    1.  **Iterate through top-level blocks** of the Markdown document (headings, paragraphs, lists).
+    2.  **Process each block independently**, generating the necessary `InsertText` and `Update...Style` requests for that block.
+    3.  **Use a reference document:** To accelerate development, we can manually create a Google Doc with the desired formatting for all our target Markdown elements. We can then use the `docs.documents.get` method to inspect the JSON structure of this document. This will serve as a "Rosetta Stone" to guide the implementation of the converter.

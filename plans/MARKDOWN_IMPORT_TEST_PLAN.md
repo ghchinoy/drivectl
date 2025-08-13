@@ -10,14 +10,17 @@ This document outlines the manual test cases for verifying the Markdown import f
     - A bulleted list
     - A numbered list
     - A hyperlink
+- [ ] A "reference" Google Doc created manually with all the target formatting.
 - [ ] The `drivectl` binary built from the `feat/docs-markdown-import` branch.
 
 ---
 
 ## Phase 1: The Converter (Unit Tests)
 
+- [ ] **Action:** Create a "reference" Google Doc with all the target formatting.
+- [ ] **Action:** Use `drivectl get <reference-doc-id> --format json` to get the JSON representation of the reference document.
 - [ ] **Action:** Add unit tests for the Markdown-to-Docs-JSON converter in `internal/drive`.
-- [ ] **Verification:** Do the unit tests pass for all supported Markdown elements?
+- [ ] **Verification:** Do the unit tests pass for all supported Markdown elements, comparing the output to the JSON from the reference document?
 
 ---
 

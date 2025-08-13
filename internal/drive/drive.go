@@ -179,4 +179,29 @@ func GetTabs(docsSvc *docs.Service, documentId string) ([]*TabInfo, error) {
 	return buildTabs(doc.Tabs, 0), nil
 }
 
+// CreateDocFromMarkdown creates a new Google Doc from a Markdown string.
+func CreateDocFromMarkdown(docsSvc *docs.Service, title string, markdownContent string) (*docs.Document, error) {
+	doc := &docs.Document{
+		Title: title,
+	}
+	createdDoc, err := docsSvc.Documents.Create(doc).Do()
+	if err != nil {
+		return nil, fmt.Errorf("could not create file: %w", err)
+	}
 
+	requests, err := MarkdownToDocsRequests(markdownContent)
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert markdown to requests: %w", err)
+	}
+
+	if len(requests) > 0 {
+		_, err = docsSvc.Documents.BatchUpdate(createdDoc.DocumentId, &docs.BatchUpdateDocumentRequest{
+			Requests: requests,
+		}).Do()
+		if err != nil {
+			return nil, fmt.Errorf("could not update document: %w", err)
+		}
+	}
+
+	return createdDoc, nil
+}
