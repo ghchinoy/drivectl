@@ -39,6 +39,9 @@ This document outlines the manual test cases for verifying the Markdown import f
 
 ## Phase 3: `docs.create` MCP Tool
 
+### Known Issues
+*   When passing Markdown text directly to the `docs.create` tool using the `markdown_text` parameter, newline characters (`\n`) are not always interpreted correctly by the shell, which can result in the text being rendered as a single line.
+
 - [ ] **Action:** Run `mcptools call docs.create -p '{"title": "MCP Markdown Test", "markdown_file": "test.md"}' ./drivectl --mcp`
 - [ ] **Verification:**
     - [ ] Is a new Google Doc named "MCP Markdown Test" created?
@@ -46,9 +49,33 @@ This document outlines the manual test cases for verifying the Markdown import f
 
 ---
 
-## Phase 4: Add/Replace Tab (Advanced)
+## Phase 4: `docs add-tab` Command
 
-*This section will be filled out if and when the advanced "add/replace tab" functionality is implemented.*
+- [ ] **Action:** Run `drivectl docs add-tab <document-id> --title "New Tab" --from-markdown test.md`
+- [ ] **Verification:**
+    - [ ] Is a new tab named "New Tab" added to the document?
+    - [ ] Does the content of the new tab correctly reflect the formatting from the `test.md` file?
+
+## Phase 5: `docs.add-tab` MCP Tool
+
+- [ ] **Action:** Run `mcptools call docs.add-tab -p '{"document-id": "<document-id>", "title": "MCP New Tab", "markdown_file": "test.md"}' ./drivectl --mcp`
+- [ ] **Verification:**
+    - [ ] Is a new tab named "MCP New Tab" added to the document?
+    - [ ] Does the content of the new tab match the formatting from the `test.md` file?
+
+## Phase 6: `docs replace-tab` Command
+
+- [ ] **Action:** Run `drivectl docs replace-tab <document-id> --tab-id <tab-id> --from-markdown test.md`
+- [ ] **Verification:**
+    - [ ] Is the content of the specified tab replaced with the content from the `test.md` file?
+    - [ ] Does the new content have the correct formatting?
+
+## Phase 7: `docs.replace-tab` MCP Tool
+
+- [ ] **Action:** Run `mcptools call docs.replace-tab -p '{"document-id": "<document-id>", "tab-id": "<tab-id>", "markdown_file": "test.md"}' ./drivectl --mcp`
+- [ ] **Verification:**
+    - [ ] Is the content of the specified tab replaced with the content from the `test.md` file?
+    - [ ] Does the new content have the correct formatting?
 
 ---
 

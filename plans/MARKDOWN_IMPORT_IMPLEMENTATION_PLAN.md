@@ -100,3 +100,14 @@ The process of converting a Markdown AST to a series of Google Docs API requests
     1.  **Iterate through top-level blocks** of the Markdown document (headings, paragraphs, lists).
     2.  **Process each block independently**, generating the necessary `InsertText` and `Update...Style` requests for that block.
     3.  **Use a reference document:** To accelerate development, we can manually create a Google Doc with the desired formatting for all our target Markdown elements. We can then use the `docs.documents.get` method to inspect the JSON structure of this document. This will serve as a "Rosetta Stone" to guide the implementation of the converter.
+
+## 6. Future Enhancements
+
+The following features are out of scope for the initial implementation, but should be considered for future versions:
+
+*   **Numbered Lists:** Support for ordered lists.
+*   **Nested Lists:** Support for nested bulleted and numbered lists.
+*   **Tables:** Support for Markdown tables.
+*   **Code Fencing:** Support for code blocks with syntax highlighting.
+*   **Images:** Support for embedding images. This will require uploading the image to Google Drive and then embedding it in the document.
+*   **More robust styling:** Support for nested styles (e.g., bold and italic text within the same run).
