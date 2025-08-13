@@ -25,7 +25,7 @@ import (
 var (
 	outputFile string
 	format     string
-	tabIndex   int
+	tabId      string
 )
 
 var getCmd = &cobra.Command{
@@ -34,12 +34,12 @@ var getCmd = &cobra.Command{
 	Long: `Downloads a file from Google Drive.
 For standard files (PDFs, images, etc.), it downloads the raw content.
 For Google Docs, it can export the entire document to various formats (txt, md, pdf, etc.) using the --format flag.
-It can also extract the plain text content of a single tab from a Google Doc using the --tab-index flag.`,
+It can also extract the plain text content of a single tab from a Google Doc using the --tab-id flag.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fileId := args[0]
 
-		content, err := drive.GetFile(driveSvc, docsSvc, fileId, format, tabIndex)
+		content, err := drive.GetFile(driveSvc, docsSvc, fileId, format, tabId)
 		if err != nil {
 			return err
 		}
@@ -47,9 +47,9 @@ It can also extract the plain text content of a single tab from a Google Doc usi
 		if outputFile != "" {
 			err := os.WriteFile(outputFile, content, 0644)
 			if err != nil {
-				return fmt.Errorf("failed to write to output file %s: %%w", outputFile, err)
+				return fmt.Errorf("failed to write to output file %s: %w", outputFile, err)
 			}
-			fmt.Printf("Successfully saved file to %%s\n", outputFile)
+			fmt.Printf("Successfully saved file to %s\n", outputFile)
 		} else {
 			// For binary formats like pdf, docx, etc., printing to console is not useful.
 			// We will just print a success message instead.
@@ -68,5 +68,5 @@ func init() {
 	rootCmd.AddCommand(getCmd)
 	getCmd.Flags().StringVarP(&outputFile, "output", "o", "", "Path to save the output file")
 	getCmd.Flags().StringVar(&format, "format", "", "Export format for Google Docs (e.g., pdf, docx, html, txt, md)")
-	getCmd.Flags().IntVar(&tabIndex, "tab-index", -1, "Index of the tab to get content from")
+	getCmd.Flags().StringVar(&tabId, "tab-id", "", "ID of the tab to get content from")
 }

@@ -55,20 +55,34 @@ func renderBodyAsText(body *docs.Body) string {
 }
 
 // GetFile downloads a file or exports a Google Doc.
-func GetFile(driveSvc *drive.Service, docsSvc *docs.Service, fileId string, format string, tabIndex int) ([]byte, error) {
-	if tabIndex >= 0 {
+func GetFile(driveSvc *drive.Service, docsSvc *docs.Service, fileId string, format string, tabId string) ([]byte, error) {
+	if tabId != "" {
 		doc, err := docsSvc.Documents.Get(fileId).IncludeTabsContent(true).Do()
 		if err != nil {
 			return nil, fmt.Errorf("unable to retrieve document with tabs: %w", err)
 		}
 
-		if tabIndex >= len(doc.Tabs) {
-			return nil, fmt.Errorf("invalid tab index: %d. Document only has %d tabs", tabIndex, len(doc.Tabs))
+		var findTab func(tabs []*docs.Tab) *docs.Tab
+		findTab = func(tabs []*docs.Tab) *docs.Tab {
+			for _, t := range tabs {
+				if t.TabProperties != nil && t.TabProperties.TabId == tabId {
+					return t
+				}
+				if len(t.ChildTabs) > 0 {
+					if found := findTab(t.ChildTabs); found != nil {
+						return found
+					}
+				}
+			}
+			return nil
 		}
 
-		theTab := doc.Tabs[tabIndex]
-		textContent := renderBodyAsText(theTab.DocumentTab.Body)
-		return []byte(textContent), nil
+		if tab := findTab(doc.Tabs); tab != nil {
+			textContent := renderBodyAsText(tab.DocumentTab.Body)
+			return []byte(textContent), nil
+		}
+
+		return nil, fmt.Errorf("tab with id %s not found", tabId)
 	}
 
 	file, err := driveSvc.Files.Get(fileId).Fields("mimeType", "name").Do()
@@ -128,18 +142,39 @@ func DescribeFile(driveSvc *drive.Service, fileId string) (*drive.File, error) {
 	return file, nil
 }
 
+// TabInfo contains information about a tab in a Google Doc.
+type TabInfo struct {
+	Title    string
+	TabID    string
+	Level    int
+	Children []*TabInfo
+}
+
 // GetTabs lists the tabs within a Google Doc.
-func GetTabs(docsSvc *docs.Service, documentId string) ([]string, error) {
+func GetTabs(docsSvc *docs.Service, documentId string) ([]*TabInfo, error) {
 	doc, err := docsSvc.Documents.Get(documentId).IncludeTabsContent(true).Do()
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve document with tabs: %w", err)
 	}
 
-	var tabs []string
-	for _, t := range doc.Tabs {
-		if t.TabProperties != nil {
-			tabs = append(tabs, t.TabProperties.Title)
+	var buildTabs func(tabs []*docs.Tab, level int) []*TabInfo
+	buildTabs = func(tabs []*docs.Tab, level int) []*TabInfo {
+		var result []*TabInfo
+		for _, t := range tabs {
+			if t.TabProperties != nil {
+				tabInfo := &TabInfo{
+					Title: t.TabProperties.Title,
+					TabID: t.TabProperties.TabId,
+					Level: level,
+				}
+				if len(t.ChildTabs) > 0 {
+					tabInfo.Children = buildTabs(t.ChildTabs, level+1)
+				}
+				result = append(result, tabInfo)
+			}
 		}
+		return result
 	}
-	return tabs, nil
+
+	return buildTabs(doc.Tabs, 0), nil
 }

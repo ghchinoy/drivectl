@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ghchinoy/drivectl/internal/drive"
 	"github.com/spf13/cobra"
@@ -44,9 +45,16 @@ var docsTabsCmd = &cobra.Command{
 		if len(tabs) == 0 {
 			fmt.Println("No tabs found.")
 		} else {
-			for _, tab := range tabs {
-				fmt.Println(tab)
+			var printTabs func(tabs []*drive.TabInfo, level int)
+			printTabs = func(tabs []*drive.TabInfo, level int) {
+				for _, tab := range tabs {
+					fmt.Printf("%s%s (%s)\n", strings.Repeat("\t", level), tab.Title, tab.TabID)
+					if len(tab.Children) > 0 {
+						printTabs(tab.Children, level+1)
+					}
+				}
 			}
+			printTabs(tabs, 0)
 		}
 		return nil
 	},
