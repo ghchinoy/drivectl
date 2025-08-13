@@ -65,19 +65,19 @@ This is the most critical and complex part of the implementation. It will be a n
 
 1.  **Phase 1: The Converter**
     *   **Research and Decision:**
-        *   **Google Drive API `files.create`:** We will first test if the Google Drive API can convert Markdown to a Google Doc by setting the source MIME type to `text/markdown` and the destination MIME type to `application/vnd.google-apps.document`. This would be the simplest solution if it works.
-        *   **Markdown Parsing Library:** If the direct conversion is not possible, we will use a Go library to parse the Markdown into an Abstract Syntax Tree (AST). The `goldmark` library is the leading candidate due to its CommonMark compliance, extensibility, and performance.
+        *   **Google Drive API `files.create`:** [x] We have tested this and confirmed that it does not work for Markdown conversion.
+        *   **Markdown Parsing Library:** [x] We have chosen `goldmark` as our parsing library.
     *   **Implementation:**
-        *   Implement the core Markdown-to-Docs-JSON converter in `internal/drive`. This will involve traversing the AST and building the corresponding Google Docs JSON structure. We will start with basic elements (headings, paragraphs, bold, italic) and expand from there.
+        *   [x] Implement the core Markdown-to-Docs-JSON converter in `internal/drive`. It currently supports headings, paragraphs, bold, italic, and bulleted lists.
 2.  **Phase 2: Create New Doc**
-    *   Implement the `docs.create` CLI command and MCP tool.
-    *   This will be the first real-world test of the converter.
+    *   [x] Implement the `docs.create` CLI command and MCP tool.
+    *   [x] This has been used to test the converter.
 3.  **Phase 3: Add/Replace Tab (Advanced)**
-    *   Investigate the feasibility and complexity of the "add tab" and "replace tab" scenarios.
-    *   If feasible, implement the `docs.add-tab` and `docs.replace-tab` commands and tools. This will likely be a significant undertaking.
+    *   [ ] Investigate the feasibility and complexity of the "add tab" and "replace tab" scenarios.
+    *   [ ] If feasible, implement the `docs.add-tab` and `docs.replace-tab` commands and tools. This will likely be a significant undertaking.
 4.  **Phase 4: Documentation and Testing**
-    *   Create a new test plan for the Markdown import functionality.
-    *   Update the `README.md` to document the new commands.
+    *   [x] Create a new test plan for the Markdown import functionality.
+    *   [ ] Update the `README.md` to document the new commands.
 
 ## 5. Lessons Learned
 

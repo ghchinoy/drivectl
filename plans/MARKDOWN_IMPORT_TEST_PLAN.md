@@ -26,14 +26,14 @@ This document outlines the manual test cases for verifying the Markdown import f
 
 ## Phase 2: `docs create` Command
 
-- [ ] **Action:** Run `drivectl docs create --title "Markdown Test" --from-markdown test.md`
-- [ ] **Verification:**
-    - [ ] Is a new Google Doc named "Markdown Test" created in your Google Drive?
-    - [ ] Does the content of the new Google Doc correctly reflect the formatting from the `test.md` file?
-        - [ ] Are headings rendered correctly?
-        - [ ] Are bold and italic styles applied correctly?
-        - [ ] Are lists formatted correctly?
-        - [ ] Is the hyperlink clickable and does it point to the correct URL?
+- [x] **Action:** Run `drivectl docs create --title "Markdown Test" --from-markdown test.md`
+- [x] **Verification:**
+    - [x] Is a new Google Doc named "Markdown Test" created in your Google Drive?
+    - [x] Does the content of the new Google Doc correctly reflect the formatting from the `test.md` file?
+        - [x] Are headings rendered correctly?
+        - [x] Are bold and italic styles applied correctly?
+        - [x] Are lists formatted correctly?
+        - [x] Is the hyperlink clickable and does it point to the correct URL?
 
 ---
 
