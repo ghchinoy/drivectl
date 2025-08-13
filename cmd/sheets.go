@@ -25,7 +25,7 @@ var sheetsCmd = &cobra.Command{
 var sheetsListCmd = &cobra.Command{
 	Use:   "list [spreadsheetId]",
 	Short: "Lists the sheets in a spreadsheet.",
-	Long:  `Lists the sheets in a spreadsheet.`,
+	Long:  `Lists all the individual sheets (tabs) within a given spreadsheet.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		spreadsheetId := args[0]
@@ -44,7 +44,7 @@ var sheetsListCmd = &cobra.Command{
 var sheetsGetCmd = &cobra.Command{
 	Use:   "get [spreadsheetId]",
 	Short: "Gets a sheet as CSV.",
-	Long:  `Gets a sheet as CSV.`,
+	Long:  `Retrieves the entire content of a specified sheet and outputs it as CSV. An optional output file can be specified.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		spreadsheetId := args[0]
@@ -56,9 +56,9 @@ var sheetsGetCmd = &cobra.Command{
 		if sheetsOutputFile != "" {
 			err := os.WriteFile(sheetsOutputFile, []byte(csv), 0644)
 			if err != nil {
-				return fmt.Errorf("failed to write to output file %s: %%w", sheetsOutputFile, err)
+				return fmt.Errorf("failed to write to output file %s: %w", sheetsOutputFile, err)
 			}
-			fmt.Printf("Successfully saved sheet to %%s\n", sheetsOutputFile)
+			fmt.Printf("Successfully saved sheet to %s\n", sheetsOutputFile)
 		} else {
 			fmt.Println(csv)
 		}
@@ -69,7 +69,7 @@ var sheetsGetCmd = &cobra.Command{
 var sheetsGetRangeCmd = &cobra.Command{
 	Use:   "get-range [spreadsheetId]",
 	Short: "Gets a specific range from a sheet.",
-	Long:  `Gets a specific range from a sheet.`,
+	Long:  `Retrieves a specific range of cells from a sheet, specified using A1 notation.`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		spreadsheetId := args[0]
@@ -97,7 +97,7 @@ var sheetsGetRangeCmd = &cobra.Command{
 var sheetsUpdateRangeCmd = &cobra.Command{
 	Use:   "update-range [spreadsheetId] [value]",
 	Short: "Updates a specific range in a sheet.",
-	Long:  `Updates a specific range in a sheet.`,
+	Long:  `Updates a specific cell or range of cells within a sheet, specified using A1 notation.`,
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		spreadsheetId := args[0]

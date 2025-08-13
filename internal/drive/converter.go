@@ -93,6 +93,33 @@ func MarkdownToDocsRequests(markdown string) ([]*docs.Request, error) {
 							Fields:    "*",
 						},
 					})
+				case ast.KindLink:
+					link := c.(*ast.Link)
+					text := string(link.Text([]byte(markdown)))
+					start := currentIndex
+					requests = append(requests, &docs.Request{
+						InsertText: &docs.InsertTextRequest{
+							Text: text,
+							Location: &docs.Location{
+								Index: currentIndex,
+							},
+						},
+					})
+					currentIndex += int64(len(text))
+					requests = append(requests, &docs.Request{
+						UpdateTextStyle: &docs.UpdateTextStyleRequest{
+							Range: &docs.Range{
+								StartIndex: start,
+								EndIndex:   currentIndex,
+							},
+							TextStyle: &docs.TextStyle{
+								Link: &docs.Link{
+									Url: string(link.Destination),
+								},
+							},
+							Fields: "link",
+						},
+					})
 				}
 			}
 			requests = append(requests, &docs.Request{
@@ -104,6 +131,39 @@ func MarkdownToDocsRequests(markdown string) ([]*docs.Request, error) {
 				},
 			})
 			currentIndex++
+		case ast.KindList:
+			list := n.(*ast.List)
+			for item := list.FirstChild(); item != nil; item = item.NextSibling() {
+				var itemText strings.Builder
+				for c := item.FirstChild(); c != nil; c = c.NextSibling() {
+					if c.Kind() == ast.KindTextBlock {
+						for c2 := c.FirstChild(); c2 != nil; c2 = c2.NextSibling() {
+							if c2.Kind() == ast.KindText {
+								itemText.WriteString(string(c2.(*ast.Text).Segment.Value([]byte(markdown))))
+							}
+						}
+					}
+				}
+				text := itemText.String()
+				requests = append(requests, &docs.Request{
+					InsertText: &docs.InsertTextRequest{
+						Text: text + "\n",
+						Location: &docs.Location{
+							Index: currentIndex,
+						},
+					},
+				})
+				requests = append(requests, &docs.Request{
+					CreateParagraphBullets: &docs.CreateParagraphBulletsRequest{
+						Range: &docs.Range{
+							StartIndex: currentIndex,
+							EndIndex:   currentIndex + int64(len(text)),
+						},
+						BulletPreset: "BULLET_DISC_CIRCLE_SQUARE",
+					},
+				})
+				currentIndex += int64(len(text)) + 1
+			}
 		}
 	}
 
