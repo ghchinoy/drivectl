@@ -100,9 +100,9 @@ type ListArgs struct {
 
 // GetArgs defines the arguments for the get tool.
 type GetArgs struct {
-	FileID   string `json:"file-id"`
-	Format   string `json:"format"`
-	TabIndex *int   `json:"tab-index"`
+	FileID string `json:"file-id"`
+	Format string `json:"format"`
+	TabID  string `json:"tab-id"`
 }
 
 // DescribeArgs defines the arguments for the describe tool.
@@ -144,29 +144,27 @@ type UpdateSheetRangeArgs struct {
 // driveQueryCheatSheetHandler is a resource handler that returns a cheat sheet of Drive query examples.
 func driveQueryCheatSheetHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.ReadResourceParams) (*mcp.ReadResourceResult, error) {
 	return &mcp.ReadResourceResult{
-			Contents: []*mcp.ResourceContents{
-				{
-					URI:      params.URI,
-					MIMEType: "text/plain",
-					Text:     driveQueryCheatSheet,
-				},
+		Contents: []*mcp.ResourceContents{
+			{
+				URI:      params.URI,
+				MIMEType: "text/plain",
+				Text:     driveQueryCheatSheet,
 			},
 		},
-		nil
+	}, nil
 }
 
 // a1NotationCheatSheetHandler is a resource handler that returns a cheat sheet of A1 notation examples.
 func a1NotationCheatSheetHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.ReadResourceParams) (*mcp.ReadResourceResult, error) {
 	return &mcp.ReadResourceResult{
-			Contents: []*mcp.ResourceContents{
-				{
-					URI:      params.URI,
-					MIMEType: "text/plain",
-					Text:     a1NotationCheatSheet,
-				},
+		Contents: []*mcp.ResourceContents{
+			{
+				URI:      params.URI,
+				MIMEType: "text/plain",
+				Text:     a1NotationCheatSheet,
 			},
 		},
-		nil
+	}, nil
 }
 
 // Start starts the MCP server.
@@ -225,12 +223,7 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 					return nil, err
 				}
 
-				tabIndex := -1
-				if params.Arguments.TabIndex != nil {
-					tabIndex = *params.Arguments.TabIndex
-				}
-
-				content, err := drive.GetFile(driveSvc, docsSvc, params.Arguments.FileID, params.Arguments.Format, tabIndex)
+				content, err := drive.GetFile(driveSvc, docsSvc, params.Arguments.FileID, params.Arguments.Format, params.Arguments.TabID)
 				if err != nil {
 					return nil, fmt.Errorf("unable to get file: %w", err)
 				}
@@ -294,9 +287,21 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 							return nil, fmt.Errorf("unable to get tabs: %w", err)
 						}
 
+						var tabStrings []string
+						var traverse func(tabs []*drive.TabInfo, level int)
+						traverse = func(tabs []*drive.TabInfo, level int) {
+							for _, tab := range tabs {
+								tabStrings = append(tabStrings, fmt.Sprintf("%s%s (%s)", strings.Repeat("\t", level), tab.Title, tab.TabID))
+								if len(tab.Children) > 0 {
+									traverse(tab.Children, level+1)
+								}
+							}
+						}
+						traverse(tabs, 0)
+
 						return &mcp.CallToolResultFor[any]{
 							Content: []mcp.Content{
-								&mcp.TextContent{Text: strings.Join(tabs, "\n")},
+								&mcp.TextContent{Text: strings.Join(tabStrings, "\n")},
 							},
 						}, nil
 					})
