@@ -78,3 +78,14 @@ This is the most critical and complex part of the implementation. It will be a n
 4.  **Phase 4: Documentation and Testing**
     *   Create a new test plan for the Markdown import functionality.
     *   Update the `README.md` to document the new commands.
+
+## 5. Lessons Learned
+
+### Validating Import Methods
+
+Before committing to building a complex parser, we tested a simpler approach based on a suggestion that the Google Drive API could handle the conversion automatically.
+
+*   **Hypothesis:** The `drive.files.create` method could convert a Markdown file to a Google Doc if the source `MimeType` was set to `text/markdown` and the destination `MimeType` was `application/vnd.google-apps.document`.
+*   **Test:** We implemented a temporary `test-md-import` command to perform this exact operation.
+*   **Result:** The test created a new Google Doc, but the content was the raw, unformatted Markdown text. The Drive API did not perform any conversion of the formatting.
+*   **Conclusion:** This experiment definitively proved that there is no built-in, automatic conversion for Markdown in the Drive or Docs APIs. Our initial plan to build a custom "Markdown to Google Docs JSON" converter is the correct and necessary path forward.

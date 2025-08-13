@@ -401,7 +401,7 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 					mcp.AddTool(server, &mcp.Tool{
 						Name:        "sheets.update-range",
 						Description: subCommand.Long,
-					}, updateRangeHandler)
+					}, sheetsUpdateRangeHandler)
 				}
 			}
 		}
@@ -446,7 +446,7 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 	return nil
 }
 
-func updateRangeHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[UpdateSheetRangeArgs]) (*mcp.CallToolResultFor[any], error) {
+func sheetsUpdateRangeHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[UpdateSheetRangeArgs]) (*mcp.CallToolResultFor[any], error) {
 	if params.Arguments.SpreadsheetID == "" {
 		return nil, fmt.Errorf("spreadsheet-id is a required argument")
 	}
