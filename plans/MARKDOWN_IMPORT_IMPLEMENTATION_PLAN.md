@@ -114,9 +114,9 @@ The process of converting a Markdown AST to a series of Google Docs API requests
 
 The following features are out of scope for the initial implementation, but should be considered for future versions:
 
-*   **Numbered Lists:** Support for ordered lists.
+*   **Numbered Lists:** [x] Support for ordered lists.
 *   **Nested Lists:** Support for nested bulleted and numbered lists.
-*   **Tables:** Support for Markdown tables.
+*   **Tables:** (DEFERRED) Support for Markdown tables. A previous attempt at implementation was unsuccessful and has been removed to ensure a stable build.
 *   **Code Fencing:** Support for code blocks with syntax highlighting.
 *   **Images:** Support for embedding images. This will require uploading the image to Google Drive and then embedding it in the document.
 *   **More robust styling:** Support for nested styles (e.g., bold and italic text within the same run).

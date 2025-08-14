@@ -10,7 +10,6 @@ This document outlines the manual test cases for verifying the Markdown import f
     - A bulleted list
     - A numbered list
     - A hyperlink
-- [ ] A "reference" Google Doc created manually with all the target formatting.
 - [ ] The `drivectl` binary built from the `feat/docs-markdown-import` branch.
 
 ---

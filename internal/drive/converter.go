@@ -179,73 +179,29 @@ func MarkdownToDocsRequests(markdown string) ([]*docs.Request, error) {
 							}
 						}
 					}
-				}
-				text := itemText.String()
-				requests = append(requests, &docs.Request{
-					InsertText: &docs.InsertTextRequest{
-						Text: text + "\n",
-						Location: &docs.Location{
-							Index: currentIndex,
+					text := itemText.String()
+					requests = append(requests, &docs.Request{
+						InsertText: &docs.InsertTextRequest{
+							Text: text + "\n",
+							Location: &docs.Location{
+								Index: currentIndex,
+							},
 						},
-					},
-				})
-				requests = append(requests, &docs.Request{
-					CreateParagraphBullets: &docs.CreateParagraphBulletsRequest{
-						Range: &docs.Range{
-							StartIndex: currentIndex,
-							EndIndex:   currentIndex + int64(len(text)),
+					})
+					requests = append(requests, &docs.Request{
+						CreateParagraphBullets: &docs.CreateParagraphBulletsRequest{
+							Range: &docs.Range{
+								StartIndex: currentIndex,
+								EndIndex:   currentIndex + int64(len(text)),
+							},
+							BulletPreset: bulletPreset,
 						},
-						BulletPreset: bulletPreset,
-					},
-				})
-				requests = append(requests, textRuns...)
-				currentIndex += int64(len(text)) + 1
-			}
-		case extension.KindTable:
-			table := n.(*extension.Table)
-			rows := 0
-			cols := 0
-			for r := table.FirstChild(); r != nil; r = r.NextSibling() {
-				rows++
-				if rows == 1 {
-					for c := r.FirstChild(); c != nil; c = c.NextSibling() {
-						cols++
-					}
+					})
+					requests = append(requests, textRuns...)
+					currentIndex += int64(len(text)) + 1
 				}
-			}
 
-			requests = append(requests, &docs.Request{
-				InsertTable: &docs.InsertTableRequest{
-					Rows:    int64(rows),
-					Columns: int64(cols),
-					Location: &docs.Location{
-						Index: currentIndex,
-					},
-				},
-			})
-			// This is not correct, I need to get the new currentIndex after the table is inserted.
-			// I will simplify this for now and just insert the text of the table.
-			var tableText strings.Builder
-			for r := table.FirstChild(); r != nil; r = r.NextSibling() {
-				for c := r.FirstChild(); c != nil; c = c.NextSibling() {
-					for c2 := c.FirstChild(); c2 != nil; c2 = c2.NextSibling() {
-						if c2.Kind() == ast.KindText {
-							tableText.WriteString(string(c2.(*ast.Text).Segment.Value([]byte(markdown))))
-						}
-					}
-					tableText.WriteString("\t")
-				}
-				tableText.WriteString("\n")
 			}
-			requests = append(requests, &docs.Request{
-				InsertText: &docs.InsertTextRequest{
-					Text: tableText.String(),
-					Location: &docs.Location{
-						Index: currentIndex,
-					},
-				},
-			})
-			currentIndex += int64(len(tableText.String()))
 		}
 	}
 
