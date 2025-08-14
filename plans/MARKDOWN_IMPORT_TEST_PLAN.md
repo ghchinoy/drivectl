@@ -49,33 +49,9 @@ This document outlines the manual test cases for verifying the Markdown import f
 
 ---
 
-## Phase 4: `docs add-tab` Command
+## Phase 4: Add/Replace Tab (Advanced) - Not Feasible
 
-- [ ] **Action:** Run `drivectl docs add-tab <document-id> --title "New Tab" --from-markdown test.md`
-- [ ] **Verification:**
-    - [ ] Is a new tab named "New Tab" added to the document?
-    - [ ] Does the content of the new tab correctly reflect the formatting from the `test.md` file?
-
-## Phase 5: `docs.add-tab` MCP Tool
-
-- [ ] **Action:** Run `mcptools call docs.add-tab -p '{"document-id": "<document-id>", "title": "MCP New Tab", "markdown_file": "test.md"}' ./drivectl --mcp`
-- [ ] **Verification:**
-    - [ ] Is a new tab named "MCP New Tab" added to the document?
-    - [ ] Does the content of the new tab match the formatting from the `test.md` file?
-
-## Phase 6: `docs replace-tab` Command
-
-- [ ] **Action:** Run `drivectl docs replace-tab <document-id> --tab-id <tab-id> --from-markdown test.md`
-- [ ] **Verification:**
-    - [ ] Is the content of the specified tab replaced with the content from the `test.md` file?
-    - [ ] Does the new content have the correct formatting?
-
-## Phase 7: `docs.replace-tab` MCP Tool
-
-- [ ] **Action:** Run `mcptools call docs.replace-tab -p '{"document-id": "<document-id>", "tab-id": "<tab-id>", "markdown_file": "test.md"}' ./drivectl --mcp`
-- [ ] **Verification:**
-    - [ ] Is the content of the specified tab replaced with the content from the `test.md` file?
-    - [ ] Does the new content have the correct formatting?
+As noted in the implementation plan, the Google Docs API does not currently support the programmatic creation of new tabs. This section of the test plan is therefore not applicable.
 
 ---
 

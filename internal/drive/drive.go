@@ -148,6 +148,7 @@ type TabInfo struct {
 	TabID    string
 	Level    int
 	Children []*TabInfo
+	Markdown string
 }
 
 // GetTabs lists the tabs within a Google Doc.
@@ -181,17 +182,17 @@ func GetTabs(docsSvc *docs.Service, documentId string) ([]*TabInfo, error) {
 
 // CreateDocFromMarkdown creates a new Google Doc from a Markdown string.
 func CreateDocFromMarkdown(docsSvc *docs.Service, title string, markdownContent string) (*docs.Document, error) {
+	requests, err := MarkdownToDocsRequests(markdownContent)
+	if err != nil {
+		return nil, fmt.Errorf("unable to convert markdown to requests: %w", err)
+	}
+
 	doc := &docs.Document{
 		Title: title,
 	}
 	createdDoc, err := docsSvc.Documents.Create(doc).Do()
 	if err != nil {
 		return nil, fmt.Errorf("could not create file: %w", err)
-	}
-
-	requests, err := MarkdownToDocsRequests(markdownContent)
-	if err != nil {
-		return nil, fmt.Errorf("unable to convert markdown to requests: %w", err)
 	}
 
 	if len(requests) > 0 {

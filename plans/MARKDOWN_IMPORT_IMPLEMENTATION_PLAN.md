@@ -72,9 +72,9 @@ This is the most critical and complex part of the implementation. It will be a n
 2.  **Phase 2: Create New Doc**
     *   [x] Implement the `docs.create` CLI command and MCP tool.
     *   [x] This has been used to test the converter.
-3.  **Phase 3: Add/Replace Tab (Advanced)**
-    *   [ ] Investigate the feasibility and complexity of the "add tab" and "replace tab" scenarios.
-    *   [ ] If feasible, implement the `docs.add-tab` and `docs.replace-tab` commands and tools. This will likely be a significant undertaking.
+3.  **Phase 3: Add/Replace Tab (Advanced) - Not Feasible**
+    *   **Investigation:** After extensive experimentation, we have determined that the Google Docs API does not support the programmatic creation of new "tabs" in a document. The `Tab` object is a read-only representation of the document's structure, and there is no API method to create or insert new tabs.
+    *   **Conclusion:** The "add tab" and "replace tab" scenarios are not feasible to implement at this time.
 4.  **Phase 4: Documentation and Testing**
     *   [x] Create a new test plan for the Markdown import functionality.
     *   [ ] Update the `README.md` to document the new commands.
