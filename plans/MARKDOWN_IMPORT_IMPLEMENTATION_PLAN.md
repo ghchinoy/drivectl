@@ -90,6 +90,15 @@ Before committing to building a complex parser, we tested a simpler approach bas
 *   **Result:** The test created a new Google Doc, but the content was the raw, unformatted Markdown text. The Drive API did not perform any conversion of the formatting.
 *   **Conclusion:** This experiment definitively proved that there is no built-in, automatic conversion for Markdown in the Drive or Docs APIs. Our initial plan to build a custom "Markdown to Google Docs JSON" converter is the correct and necessary path forward.
 
+### Tab Implementation
+
+Our initial attempts to implement the "add tab" and "replace tab" features were based on a misunderstanding of the Google Docs API. We learned the following:
+
+*   **"Tabs" are not first-class objects:** The `Tab` object in the API is a read-only representation of the document's structure. It cannot be created or inserted directly.
+*   **Headings and Bookmarks:** We experimented with creating navigable "tabs" by styling headings and creating bookmarks. While this approach showed some promise, it was not a reliable way to create the desired user experience.
+*   **Undocumented API Features:** We discovered that the `createTab` request type exists but is not documented in the client library. This highlights the importance of sometimes going beyond the official documentation and experimenting with direct API calls.
+*   **API Limitations:** Ultimately, we concluded that the programmatic creation of new tabs in a way that mirrors the UI is not a supported feature of the Google Docs API at this time.
+
 ### Converter Implementation Strategy
 
 The process of converting a Markdown AST to a series of Google Docs API requests is complex. A naive approach of walking the AST and generating requests on the fly proved to be brittle, especially for handling nested styles and paragraph-level formatting.
