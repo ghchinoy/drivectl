@@ -64,14 +64,59 @@ This is the most critical and complex part of the implementation. It will be a n
 ## 4. Implementation Phases
 
 1.  **Phase 1: The Converter**
-    *   Choose a Markdown parsing library.
-    *   Implement the core Markdown-to-Docs-JSON converter in `internal/drive`. Start with basic elements (headings, paragraphs, bold, italic) and expand from there.
+    *   **Research and Decision:**
+        *   **Google Drive API `files.create`:** [x] We have tested this and confirmed that it does not work for Markdown conversion.
+        *   **Markdown Parsing Library:** [x] We have chosen `goldmark` as our parsing library.
+    *   **Implementation:**
+        *   [x] Implement the core Markdown-to-Docs-JSON converter in `internal/drive`. It currently supports headings, paragraphs, bold, italic, and bulleted lists.
 2.  **Phase 2: Create New Doc**
-    *   Implement the `docs.create` CLI command and MCP tool.
-    *   This will be the first real-world test of the converter.
-3.  **Phase 3: Add/Replace Tab (Advanced)**
-    *   Investigate the feasibility and complexity of the "add tab" and "replace tab" scenarios.
-    *   If feasible, implement the `docs.add-tab` and `docs.replace-tab` commands and tools. This will likely be a significant undertaking.
+    *   [x] Implement the `docs.create` CLI command and MCP tool.
+    *   [x] This has been used to test the converter.
+3.  **Phase 3: Add/Replace Tab (Advanced) - Not Feasible**
+    *   **Investigation:** After extensive experimentation, we have determined that the Google Docs API does not support the programmatic creation of new "tabs" in a document. The `Tab` object is a read-only representation of the document's structure, and there is no API method to create or insert new tabs.
+    *   **Conclusion:** The "add tab" and "replace tab" scenarios are not feasible to implement at this time.
 4.  **Phase 4: Documentation and Testing**
-    *   Create a new test plan for the Markdown import functionality.
-    *   Update the `README.md` to document the new commands.
+    *   [x] Create a new test plan for the Markdown import functionality.
+    *   [ ] Update the `README.md` to document the new commands.
+
+## 5. Lessons Learned
+
+### Validating Import Methods
+
+Before committing to building a complex parser, we tested a simpler approach based on a suggestion that the Google Drive API could handle the conversion automatically.
+
+*   **Hypothesis:** The `drive.files.create` method could convert a Markdown file to a Google Doc if the source `MimeType` was set to `text/markdown` and the destination `MimeType` was `application/vnd.google-apps.document`.
+*   **Test:** We implemented a temporary `test-md-import` command to perform this exact operation.
+*   **Result:** The test created a new Google Doc, but the content was the raw, unformatted Markdown text. The Drive API did not perform any conversion of the formatting.
+*   **Conclusion:** This experiment definitively proved that there is no built-in, automatic conversion for Markdown in the Drive or Docs APIs. Our initial plan to build a custom "Markdown to Google Docs JSON" converter is the correct and necessary path forward.
+
+### Tab Implementation
+
+Our initial attempts to implement the "add tab" and "replace tab" features were based on a misunderstanding of the Google Docs API. We learned the following:
+
+*   **"Tabs" are not first-class objects:** The `Tab` object in the API is a read-only representation of the document's structure. It cannot be created or inserted directly.
+*   **Headings and Bookmarks:** We experimented with creating navigable "tabs" by styling headings and creating bookmarks. While this approach showed some promise, it was not a reliable way to create the desired user experience.
+*   **Undocumented API Features:** We discovered that the `createTab` request type exists but is not documented in the client library. This highlights the importance of sometimes going beyond the official documentation and experimenting with direct API calls.
+*   **API Limitations:** Ultimately, we concluded that the programmatic creation of new tabs in a way that mirrors the UI is not a supported feature of the Google Docs API at this time.
+
+### Converter Implementation Strategy
+
+The process of converting a Markdown AST to a series of Google Docs API requests is complex. A naive approach of walking the AST and generating requests on the fly proved to be brittle, especially for handling nested styles and paragraph-level formatting.
+
+*   **Initial Approach:** The first implementation attempted to create `InsertText` and `Update...Style` requests in a single pass of the AST.
+*   **Problem:** This led to incorrect styling, such as heading styles being applied to the entire document, because the ranges for the style updates were not being calculated correctly.
+*   **Revised Strategy:** A more robust approach is to:
+    1.  **Iterate through top-level blocks** of the Markdown document (headings, paragraphs, lists).
+    2.  **Process each block independently**, generating the necessary `InsertText` and `Update...Style` requests for that block.
+    3.  **Use a reference document:** To accelerate development, we can manually create a Google Doc with the desired formatting for all our target Markdown elements. We can then use the `docs.documents.get` method to inspect the JSON structure of this document. This will serve as a "Rosetta Stone" to guide the implementation of the converter.
+
+## 6. Future Enhancements
+
+The following features are out of scope for the initial implementation, but should be considered for future versions:
+
+*   **Numbered Lists:** [x] Support for ordered lists.
+*   **Nested Lists:** Support for nested bulleted and numbered lists.
+*   **Tables:** (DEFERRED) Support for Markdown tables. A previous attempt at implementation was unsuccessful and has been removed to ensure a stable build.
+*   **Code Fencing:** Support for code blocks with syntax highlighting.
+*   **Images:** Support for embedding images. This will require uploading the image to Google Drive and then embedding it in the document.
+*   **More robust styling:** Support for nested styles (e.g., bold and italic text within the same run).

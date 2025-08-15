@@ -1,9 +1,9 @@
-
 package cmd
 
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/ghchinoy/drivectl/internal/drive"
@@ -18,6 +18,8 @@ import (
 var (
 	// noBrowserAuth is a flag to disable opening the browser for authentication.
 	noBrowserAuth bool
+	// client is the HTTP client used for all API calls.
+	client *http.Client
 	// driveSvc is the Google Drive service client.
 	driveSvc *googledrive.Service
 	// docsSvc is the Google Docs service client.
@@ -32,7 +34,7 @@ var rootCmd = &cobra.Command{
 	Short: "A CLI for Google Drive and Docs.",
 	Long: `drivectl is a powerful command-line tool for interacting with your Google Drive files.
 It allows you to list, describe, and download files, with advanced support for
-Google Docs, including exporting to multiple formats and accessing individual tabs.`,
+Google Docs, including exporting to multiple formats and accessing individual tabs.`, 
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		secretFile := viper.GetString("secret-file")
 		if secretFile == "" {
@@ -40,7 +42,8 @@ Google Docs, including exporting to multiple formats and accessing individual ta
 		}
 
 		ctx := context.Background()
-		client, err := drive.NewOAuthClient(ctx, secretFile, noBrowserAuth)
+		var err error
+		client, err = drive.NewOAuthClient(ctx, secretFile, noBrowserAuth)
 		if err != nil {
 			return fmt.Errorf("could not create oauth client: %w", err)
 		}
