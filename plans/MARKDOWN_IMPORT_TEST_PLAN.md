@@ -5,6 +5,7 @@ This document outlines the manual test cases for verifying the Markdown import f
 ## Prerequisites
 
 - [ ] A sample Markdown file (`test.md`) with a variety of elements:
+- [ ] A sample Markdown file (`test3.md`) with a variety of elements, including sub-lists:
     - Headings (H1, H2, H3)
     - Paragraphs with **bold** and *italic* text
     - A bulleted list
@@ -25,7 +26,7 @@ This document outlines the manual test cases for verifying the Markdown import f
 
 ## Phase 2: `docs create` Command
 
-- [x] **Action:** Run `drivectl docs create --title "Markdown Test" --from-markdown test.md`
+- [x] **Action:** Run `drivectl docs create --title "Markdown Test" --from-markdown test3.md`
 - [x] **Verification:**
     - [x] Is a new Google Doc named "Markdown Test" created in your Google Drive?
     - [x] Does the content of the new Google Doc correctly reflect the formatting from the `test.md` file?
