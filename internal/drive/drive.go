@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	"google.golang.org/api/docs/v1"
-	"google.golang.org/api/drive/v3"
+	googledrive "google.golang.org/api/drive/v3"
 )
 
 // ListFiles lists the files and folders in Google Drive.
-func ListFiles(srv *drive.Service, limit int64, query string) ([]*drive.File, error) {
+func ListFiles(srv *googledrive.Service, limit int64, query string) ([]*googledrive.File, error) {
 	r, err := srv.Files.List().PageSize(limit).Q(query).
 		Fields("nextPageToken, files(id, name)").Do()
 	if err != nil {
@@ -34,28 +34,12 @@ var formatMap = map[string]string{
 	"ods":      "application/vnd.oasis.opendocument.spreadsheet",
 	"pptx":     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 	"odp":      "application/vnd.oasis.opendocument.presentation",
-}
-
-// renderBodyAsText converts a Google Docs Body object to a plain text string.
-func renderBodyAsText(body *docs.Body) string {
-	var text strings.Builder
-	if body == nil || body.Content == nil {
-		return ""
-	}
-	for _, element := range body.Content {
-		if element.Paragraph != nil {
-			for _, pElem := range element.Paragraph.Elements {
-				if pElem.TextRun != nil {
-					text.WriteString(pElem.TextRun.Content)
-				}
-			}
-		}
-	}
-	return text.String()
+	"png":      "image/png",
+	"jpg":      "image/jpeg",
 }
 
 // GetFile downloads a file or exports a Google Doc.
-func GetFile(driveSvc *drive.Service, docsSvc *docs.Service, fileId string, format string, tabId string) ([]byte, error) {
+func GetFile(driveSvc *googledrive.Service, docsSvc *docs.Service, fileId string, format string, tabId string) ([]byte, error) {
 	if tabId != "" {
 		doc, err := docsSvc.Documents.Get(fileId).IncludeTabsContent(true).Do()
 		if err != nil {
@@ -102,6 +86,10 @@ func GetFile(driveSvc *drive.Service, docsSvc *docs.Service, fileId string, form
 			if format == "" || format == "txt" {
 				exportMimeType = "text/csv"
 			}
+		} else if file.MimeType == "application/vnd.google-apps.presentation" {
+			if format == "" || format == "txt" {
+				exportMimeType = "text/plain"
+			}
 		} else if format == "" {
 			exportMimeType = "text/plain"
 		}
@@ -134,7 +122,7 @@ func GetFile(driveSvc *drive.Service, docsSvc *docs.Service, fileId string, form
 }
 
 // DescribeFile shows detailed metadata for a specific file.
-func DescribeFile(driveSvc *drive.Service, fileId string) (*drive.File, error) {
+func DescribeFile(driveSvc *googledrive.Service, fileId string) (*googledrive.File, error) {
 	file, err := driveSvc.Files.Get(fileId).Fields("*").Do()
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve file: %w", err)
@@ -142,67 +130,15 @@ func DescribeFile(driveSvc *drive.Service, fileId string) (*drive.File, error) {
 	return file, nil
 }
 
-// TabInfo contains information about a tab in a Google Doc.
-type TabInfo struct {
-	Title    string
-	TabID    string
-	Level    int
-	Children []*TabInfo
-	Markdown string
-}
-
-// GetTabs lists the tabs within a Google Doc.
-func GetTabs(docsSvc *docs.Service, documentId string) ([]*TabInfo, error) {
-	doc, err := docsSvc.Documents.Get(documentId).IncludeTabsContent(true).Do()
-	if err != nil {
-		return nil, fmt.Errorf("unable to retrieve document with tabs: %w", err)
+// UploadFile uploads a file to Google Drive.
+func UploadFile(driveSvc *googledrive.Service, name string, mimeType string, content io.Reader) (*googledrive.File, error) {
+	file := &googledrive.File{
+		Name:     name,
+		MimeType: mimeType,
 	}
-
-	var buildTabs func(tabs []*docs.Tab, level int) []*TabInfo
-	buildTabs = func(tabs []*docs.Tab, level int) []*TabInfo {
-		var result []*TabInfo
-		for _, t := range tabs {
-			if t.TabProperties != nil {
-				tabInfo := &TabInfo{
-					Title: t.TabProperties.Title,
-					TabID: t.TabProperties.TabId,
-					Level: level,
-				}
-				if len(t.ChildTabs) > 0 {
-					tabInfo.Children = buildTabs(t.ChildTabs, level+1)
-				}
-				result = append(result, tabInfo)
-			}
-		}
-		return result
-	}
-
-	return buildTabs(doc.Tabs, 0), nil
-}
-
-// CreateDocFromMarkdown creates a new Google Doc from a Markdown string.
-func CreateDocFromMarkdown(docsSvc *docs.Service, title string, markdownContent string) (*docs.Document, error) {
-	requests, err := MarkdownToDocsRequests(markdownContent)
-	if err != nil {
-		return nil, fmt.Errorf("unable to convert markdown to requests: %w", err)
-	}
-
-	doc := &docs.Document{
-		Title: title,
-	}
-	createdDoc, err := docsSvc.Documents.Create(doc).Do()
+	file, err := driveSvc.Files.Create(file).Media(content).Do()
 	if err != nil {
 		return nil, fmt.Errorf("could not create file: %w", err)
 	}
-
-	if len(requests) > 0 {
-		_, err = docsSvc.Documents.BatchUpdate(createdDoc.DocumentId, &docs.BatchUpdateDocumentRequest{
-			Requests: requests,
-		}).Do()
-		if err != nil {
-			return nil, fmt.Errorf("could not update document: %w", err)
-		}
-	}
-
-	return createdDoc, nil
+	return file, nil
 }

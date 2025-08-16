@@ -13,6 +13,7 @@ import (
 	googledrive "google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
+	"google.golang.org/api/slides/v1"
 )
 
 var (
@@ -26,6 +27,7 @@ var (
 	docsSvc *docs.Service
 	// sheetsSvc is the Google Sheets service client.
 	sheetsSvc *sheets.Service
+	slidesSvc *slides.Service
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -61,6 +63,11 @@ Google Docs, including exporting to multiple formats and accessing individual ta
 		sheetsSvc, err = sheets.NewService(ctx, option.WithHTTPClient(client))
 		if err != nil {
 			return fmt.Errorf("could not create sheets service: %w", err)
+		}
+
+		slidesSvc, err = slides.NewService(ctx, option.WithHTTPClient(client))
+		if err != nil {
+			return fmt.Errorf("could not create slides service: %w", err)
 		}
 		return nil
 	},

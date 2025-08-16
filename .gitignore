@@ -1,3 +1,6 @@
+.DS_Store
+.gemini/
+
 # Binaries for programs and plugins
 *.exe
 *.exe~

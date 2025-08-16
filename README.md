@@ -27,6 +27,7 @@ A command-line tool for interacting with the Google Drive API.
 4.  Search for and enable the following APIs:
     *   **Google Drive API**
     *   **Google Docs API**
+    *   **Google Slides API**
 5.  Go to **APIs & Services > Credentials**.
 6.  Click **Create Credentials > OAuth client ID**.
 7.  Select **Desktop app** as the application type.
