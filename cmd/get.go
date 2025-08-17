@@ -23,9 +23,10 @@ import (
 )
 
 var (
-	outputFile string
-	format     string
-	tabId      string
+	getFormat    string
+	getTabId     string
+	noImages     bool
+	outputFile   string
 )
 
 var getCmd = &cobra.Command{
@@ -39,7 +40,7 @@ It can also extract the plain text content of a single tab from a Google Doc usi
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fileId := args[0]
 
-		content, err := drive.GetFile(driveSvc, docsSvc, fileId, format, tabId)
+		content, err := drive.GetFile(driveSvc, docsSvc, fileId, getFormat, getTabId, noImages)
 		if err != nil {
 			return err
 		}
@@ -53,7 +54,7 @@ It can also extract the plain text content of a single tab from a Google Doc usi
 		} else {
 			// For binary formats like pdf, docx, etc., printing to console is not useful.
 			// We will just print a success message instead.
-			if format != "" && format != "txt" && format != "html" && format != "md" {
+			if getFormat != "" && getFormat != "txt" && getFormat != "html" && getFormat != "md" {
 				fmt.Printf("Successfully downloaded file content. Use the -o flag to save it to a file.\n")
 			} else {
 				fmt.Println(string(content))
@@ -65,8 +66,9 @@ It can also extract the plain text content of a single tab from a Google Doc usi
 }
 
 func init() {
-	rootCmd.AddCommand(getCmd)
+	getCmd.Flags().StringVar(&getFormat, "format", "", "The format to export the file in. If not provided, the file will be downloaded in its native format.")
+	getCmd.Flags().StringVar(&getTabId, "tab-id", "", "The ID of the tab to get. If provided, only the content of this tab will be returned.")
+	getCmd.Flags().BoolVar(&noImages, "no-images", false, "Exclude images from the document content.")
 	getCmd.Flags().StringVarP(&outputFile, "output", "o", "", "Path to save the output file")
-	getCmd.Flags().StringVar(&format, "format", "", "Export format for Google Docs (e.g., pdf, docx, html, txt, md)")
-	getCmd.Flags().StringVar(&tabId, "tab-id", "", "ID of the tab to get content from")
+	rootCmd.AddCommand(getCmd)
 }

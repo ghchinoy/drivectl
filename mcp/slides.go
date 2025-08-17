@@ -86,7 +86,7 @@ func SlidesGetHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.Ca
 		if err != nil {
 			return nil, err
 		}
-		content, err := drive.GetFile(driveSvc, docsSvc, params.Arguments.PresentationID, params.Arguments.Format, "")
+		content, err := drive.GetFile(driveSvc, docsSvc, params.Arguments.PresentationID, params.Arguments.Format, "", false)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get presentation: %w", err)
 		}

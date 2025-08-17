@@ -28,6 +28,7 @@ var (
 	// sheetsSvc is the Google Sheets service client.
 	sheetsSvc *sheets.Service
 	slidesSvc *slides.Service
+	logFile     string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -88,10 +89,12 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&noBrowserAuth, "no-browser-auth", false, "do not open a browser for authentication")
 	rootCmd.PersistentFlags().Bool("mcp", false, "enable MCP server mode over stdio")
 	rootCmd.PersistentFlags().String("mcp-http", "", "enable MCP server mode over HTTP at the given address")
+	rootCmd.PersistentFlags().StringVar(&logFile, "log-file", "", "Path to a file to write logs to. If not set, logs are written to stderr.")
 	viper.BindPFlag("secret-file", rootCmd.PersistentFlags().Lookup("secret-file"))
 	viper.BindEnv("secret-file", "DRIVE_SECRETS")
 	viper.BindPFlag("mcp", rootCmd.PersistentFlags().Lookup("mcp"))
 	viper.BindPFlag("mcp-http", rootCmd.PersistentFlags().Lookup("mcp-http"))
+	viper.BindPFlag("log-file", rootCmd.PersistentFlags().Lookup("log-file"))
 }
 
 // initConfig reads in config file and ENV variables if set.

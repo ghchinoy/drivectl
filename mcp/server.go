@@ -169,19 +169,28 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 		return http.ListenAndServe(httpAddr, handler)
 	}
 
-	logFile, err := os.OpenFile("drivectl-mcp.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		return fmt.Errorf("failed to open log file: %w", err)
-	}
-	defer logFile.Close()
-
-	log.SetOutput(logFile)
-
-	t := mcp.NewLoggingTransport(mcp.NewStdioTransport(), logFile)
-	if err := server.Run(context.Background(), t); err != nil {
-		log.Printf("Server failed: %v", err)
-		return err
+	logFile := viper.GetString("log-file")
+	if logFile != "" {
+		f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			return fmt.Errorf("failed to open log file: %w", err)
+		}
+		defer f.Close()
+		log.SetOutput(f)
+		fmt.Printf("MCP server logging to %s\n", logFile)
+		t := mcp.NewLoggingTransport(mcp.NewStdioTransport(), f)
+		if err := server.Run(context.Background(), t); err != nil {
+			log.Printf("Server failed: %v", err)
+			return err
+		}
+	} else {
+		t := mcp.NewStdioTransport()
+		if err := server.Run(context.Background(), t); err != nil {
+			log.Printf("Server failed: %v", err)
+			return err
+		}
 	}
 
 	return nil
 }
+

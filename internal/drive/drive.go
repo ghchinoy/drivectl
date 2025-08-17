@@ -39,7 +39,21 @@ var formatMap = map[string]string{
 }
 
 // GetFile downloads a file or exports a Google Doc.
-func GetFile(driveSvc *googledrive.Service, docsSvc *docs.Service, fileId string, format string, tabId string) ([]byte, error) {
+func GetFile(driveSvc *googledrive.Service, docsSvc *docs.Service, fileId string, format string, tabId string, noImages bool) ([]byte, error) {
+	if noImages {
+		resp, err := driveSvc.Files.Export(fileId, "text/plain").Download()
+		if err != nil {
+			return nil, fmt.Errorf("unable to export Google Doc as plain text: %w", err)
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read exported content: %w", err)
+		}
+		return body, nil
+	}
+
 	if tabId != "" {
 		doc, err := docsSvc.Documents.Get(fileId).IncludeTabsContent(true).Do()
 		if err != nil {

@@ -18,9 +18,10 @@ type ListArgs struct {
 
 // GetArgs defines the arguments for the get tool.
 type GetArgs struct {
-	FileID string `json:"file-id"`
-	Format string `json:"format"`
-	TabID  string `json:"tab-id"`
+	FileID   string `json:"file-id"`
+	Format   string `json:"format"`
+	TabID    string `json:"tab-id"`
+	NoImages bool   `json:"no-images"`
 }
 
 // DescribeArgs defines the arguments for the describe tool.
@@ -71,7 +72,7 @@ func GetHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallTool
 		return nil, err
 	}
 
-	content, err := drive.GetFile(driveSvc, docsSvc, params.Arguments.FileID, params.Arguments.Format, params.Arguments.TabID)
+	content, err := drive.GetFile(driveSvc, docsSvc, params.Arguments.FileID, params.Arguments.Format, params.Arguments.TabID, params.Arguments.NoImages)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get file: %w", err)
 	}

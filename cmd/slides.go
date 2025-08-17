@@ -54,7 +54,7 @@ var slidesGetCmd = &cobra.Command{
 			}
 			fmt.Printf("Successfully exported slides to %s\n", slidesOutputFile)
 		} else if slidesFormat != "" {
-			content, err := drive.GetFile(driveSvc, docsSvc, presentationId, slidesFormat, "")
+			content, err := drive.GetFile(driveSvc, docsSvc, presentationId, slidesFormat, "", false)
 			if err != nil {
 				return err
 			}
