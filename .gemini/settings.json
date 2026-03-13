@@ -1,12 +1,5 @@
 {
-  "mcpServers": {
-    "drive": {
-      "command": "drivectl",
-      "args": ["--mcp"],
-      "env": {
-        "DRIVE_SECRETS": "/Users/ghchinoy/secrets/client_google-drive-api_ghchinoy-genai-blackbelt-fishfooding.json"
-      },
-      "trust": true
-    }
-  }
+  "context": {
+    "fileName": ["AGENTS.md", "CONTEXT.md", "GEMINI.md"]
+  }  
 }
