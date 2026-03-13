@@ -6,6 +6,7 @@ When working with Go projects, use the following commands for common tasks:
 *   **Test:** `go test ./...`
 *   **Run:** `go run main.go`
 *   **Dependencies:** `go mod tidy`
+*   **Linting & Code Health:** `golangci-lint run -E gocyclo -E cyclop -E gocognit` (for enforcing style, catching errors, and limiting code complexity)
 
 ## Code Explanation and Architectural Analysis
 

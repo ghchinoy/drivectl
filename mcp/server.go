@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -175,71 +174,72 @@ func a1NotationCheatSheetHandler(ctx context.Context, ss *mcp.ServerSession, par
 	}, nil
 }
 
-// Start starts the MCP server.
-func Start(rootCmd *cobra.Command, httpAddr string) error {
-	server := mcp.NewServer(&mcp.Implementation{Name: "drivectl"}, nil)
+func registerDocsTools(server *mcp.Server, command *cobra.Command) {
+	for _, subCmd := range command.Commands() {
+		switch subCmd.Name() {
+		case "tabs":
+			mcp.AddTool(server, &mcp.Tool{
+				Name:        "docs.tabs",
+				Description: subCmd.Long,
+			}, docsTabsHandler)
+		case "create":
+			mcp.AddTool(server, &mcp.Tool{
+				Name:        "docs.create",
+				Description: subCmd.Long,
+			}, docsCreateHandler)
+		}
+	}
+}
 
-	for _, cmd := range rootCmd.Commands() {
-		command := cmd
-
-		switch command.Name() {
+func registerSheetsTools(server *mcp.Server, command *cobra.Command) {
+	for _, subCmd := range command.Commands() {
+		switch subCmd.Name() {
 		case "list":
 			mcp.AddTool(server, &mcp.Tool{
-				Name:        command.Name(),
-				Description: command.Long,
+				Name:        "sheets.list",
+				Description: subCmd.Long,
+			}, sheetsListHandler)
+		case "get":
+			mcp.AddTool(server, &mcp.Tool{
+				Name:        "sheets.get",
+				Description: subCmd.Long,
+			}, sheetsGetHandler)
+		case "get-range":
+			mcp.AddTool(server, &mcp.Tool{
+				Name:        "sheets.get-range",
+				Description: subCmd.Long,
+			}, sheetsGetRangeHandler)
+		case "update-range":
+			mcp.AddTool(server, &mcp.Tool{
+				Name:        "sheets.update-range",
+				Description: subCmd.Long,
+			}, sheetsUpdateRangeHandler)
+		}
+	}
+}
+
+func registerToolsAndResources(server *mcp.Server, rootCmd *cobra.Command) {
+	for _, cmd := range rootCmd.Commands() {
+		switch cmd.Name() {
+		case "list":
+			mcp.AddTool(server, &mcp.Tool{
+				Name:        cmd.Name(),
+				Description: cmd.Long,
 			}, listHandler)
 		case "get":
 			mcp.AddTool(server, &mcp.Tool{
-				Name:        command.Name(),
-				Description: command.Long,
+				Name:        cmd.Name(),
+				Description: cmd.Long,
 			}, getHandler)
 		case "describe":
 			mcp.AddTool(server, &mcp.Tool{
-				Name:        command.Name(),
-				Description: command.Long,
+				Name:        cmd.Name(),
+				Description: cmd.Long,
 			}, describeHandler)
 		case "docs":
-			for _, subCmd := range command.Commands() {
-				subCommand := subCmd
-				switch subCommand.Name() {
-				case "tabs":
-					mcp.AddTool(server, &mcp.Tool{
-						Name:        "docs.tabs",
-						Description: subCommand.Long,
-					}, docsTabsHandler)
-				case "create":
-					mcp.AddTool(server, &mcp.Tool{
-						Name:        "docs.create",
-						Description: subCommand.Long,
-					}, docsCreateHandler)
-				}
-			}
+			registerDocsTools(server, cmd)
 		case "sheets":
-			for _, subCmd := range command.Commands() {
-				subCommand := subCmd
-				switch subCommand.Name() {
-				case "list":
-					mcp.AddTool(server, &mcp.Tool{
-						Name:        "sheets.list",
-						Description: subCommand.Long,
-					}, sheetsListHandler)
-				case "get":
-					mcp.AddTool(server, &mcp.Tool{
-						Name:        "sheets.get",
-						Description: subCommand.Long,
-					}, sheetsGetHandler)
-				case "get-range":
-					mcp.AddTool(server, &mcp.Tool{
-						Name:        "sheets.get-range",
-						Description: subCommand.Long,
-					}, sheetsGetRangeHandler)
-				case "update-range":
-					mcp.AddTool(server, &mcp.Tool{
-						Name:        "sheets.update-range",
-						Description: subCommand.Long,
-					}, sheetsUpdateRangeHandler)
-				}
-			}
+			registerSheetsTools(server, cmd)
 		}
 	}
 
@@ -258,6 +258,13 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 		MIMEType:    "text/plain",
 		URI:         "embedded:a1-notation-cheat-sheet",
 	}, a1NotationCheatSheetHandler)
+}
+
+// Start starts the MCP server.
+func Start(rootCmd *cobra.Command, httpAddr string) error {
+	server := mcp.NewServer(&mcp.Implementation{Name: "drivectl"}, nil)
+
+	registerToolsAndResources(server, rootCmd)
 
 	if httpAddr != "" {
 		handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
@@ -416,7 +423,7 @@ func docsCreateHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.C
 
 	var markdownContent string
 	if params.Arguments.MarkdownFile != "" {
-		content, err := ioutil.ReadFile(params.Arguments.MarkdownFile)
+		content, err := os.ReadFile(params.Arguments.MarkdownFile)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read markdown file: %w", err)
 		}

@@ -36,16 +36,16 @@ var rootCmd = &cobra.Command{
 It allows you to list, describe, and download files, with advanced support for
 Google Docs, including exporting to multiple formats and accessing individual tabs.`, 
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		secretFile := viper.GetString("secret-file")
-		if secretFile == "" {
-			return fmt.Errorf("client secret file not set. Please use the --secret-file flag or set the DRIVE_SECRETS environment variable")
+		if cmd.Name() == "login" || cmd.Name() == "auth" {
+			return nil
 		}
+		secretFile := viper.GetString("secret-file")
 
 		ctx := context.Background()
 		var err error
 		client, err = drive.NewOAuthClient(ctx, secretFile, noBrowserAuth)
 		if err != nil {
-			return fmt.Errorf("could not create oauth client: %w", err)
+			return fmt.Errorf("could not create oauth client. Have you run 'drivectl auth login'? Error: %w", err)
 		}
 
 		driveSvc, err = googledrive.NewService(ctx, option.WithHTTPClient(client))
@@ -81,10 +81,10 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&noBrowserAuth, "no-browser-auth", false, "do not open a browser for authentication")
 	rootCmd.PersistentFlags().Bool("mcp", false, "enable MCP server mode over stdio")
 	rootCmd.PersistentFlags().String("mcp-http", "", "enable MCP server mode over HTTP at the given address")
-	viper.BindPFlag("secret-file", rootCmd.PersistentFlags().Lookup("secret-file"))
-	viper.BindEnv("secret-file", "DRIVE_SECRETS")
-	viper.BindPFlag("mcp", rootCmd.PersistentFlags().Lookup("mcp"))
-	viper.BindPFlag("mcp-http", rootCmd.PersistentFlags().Lookup("mcp-http"))
+	_ = viper.BindPFlag("secret-file", rootCmd.PersistentFlags().Lookup("secret-file"))
+	_ = viper.BindEnv("secret-file", "DRIVE_SECRETS")
+	_ = viper.BindPFlag("mcp", rootCmd.PersistentFlags().Lookup("mcp"))
+	_ = viper.BindPFlag("mcp-http", rootCmd.PersistentFlags().Lookup("mcp-http"))
 }
 
 // initConfig reads in config file and ENV variables if set.

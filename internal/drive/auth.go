@@ -16,11 +16,32 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
+// ConfigDir returns the path to the application's config directory.
+func ConfigDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user home directory: %w", err)
+	}
+	configDir := filepath.Join(homeDir, ".config", "drivectl")
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return "", fmt.Errorf("failed to create config directory: %w", err)
+	}
+	return configDir, nil
+}
+
 // NewOAuthClient creates a new HTTP client with OAuth 2.0 authentication.
 func NewOAuthClient(ctx context.Context, secretFile string, noBrowserAuth bool) (*http.Client, error) {
+	if secretFile == "" {
+		configDir, err := ConfigDir()
+		if err != nil {
+			return nil, err
+		}
+		secretFile = filepath.Join(configDir, "client_secret.json")
+	}
+
 	b, err := os.ReadFile(secretFile)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read client secret file: %v", err)
+		return nil, fmt.Errorf("unable to read client secret file at %s: %v", secretFile, err)
 	}
 
 	config, err := google.ConfigFromJSON(b, drive.DriveReadonlyScope, docs.DocumentsReadonlyScope, sheets.SpreadsheetsScope, drive.DriveFileScope)
@@ -112,15 +133,11 @@ func GetTokenFromWeb(config *oauth2.Config) (*oauth2.Token, error) {
 
 // TokenCacheFile returns the path to the token cache file.
 func TokenCacheFile() (string, error) {
-	homeDir, err := os.UserHomeDir()
+	configDir, err := ConfigDir()
 	if err != nil {
-		return "", fmt.Errorf("failed to get user home directory: %w", err)
+		return "", err
 	}
-	tokenCacheDir := filepath.Join(homeDir, ".config", "drivectl")
-	if err := os.MkdirAll(tokenCacheDir, 0700); err != nil {
-		return "", fmt.Errorf("failed to create token cache directory: %w", err)
-	}
-	return filepath.Join(tokenCacheDir, "token.json"), nil
+	return filepath.Join(configDir, "token.json"), nil
 }
 
 // TokenFromFile retrieves a token from a file.

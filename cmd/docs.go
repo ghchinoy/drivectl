@@ -16,16 +16,11 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/ghchinoy/drivectl/internal/drive"
 	"github.com/spf13/cobra"
-)
-
-var (
-	addTabTitle        string
-	addTabMarkdownFile string
 )
 
 var docsCmd = &cobra.Command{
@@ -75,7 +70,7 @@ var docsCreateCmd = &cobra.Command{
 		title := args[0]
 		markdownFile := args[1]
 
-		content, err := ioutil.ReadFile(markdownFile)
+		content, err := os.ReadFile(markdownFile)
 		if err != nil {
 			return fmt.Errorf("unable to read markdown file: %w", err)
 		}

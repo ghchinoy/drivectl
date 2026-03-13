@@ -120,16 +120,16 @@ func init() {
 	sheetsCmd.AddCommand(sheetsUpdateRangeCmd)
 
 	sheetsGetCmd.Flags().StringVar(&sheetName, "sheet", "", "Name of the sheet to get")
-	sheetsGetCmd.MarkFlagRequired("sheet")
+	_ = sheetsGetCmd.MarkFlagRequired("sheet")
 	sheetsGetCmd.Flags().StringVarP(&sheetsOutputFile, "output", "o", "", "Path to save the output file")
 
 	sheetsGetRangeCmd.Flags().StringVar(&sheetName, "sheet", "", "Name of the sheet")
-	sheetsGetRangeCmd.MarkFlagRequired("sheet")
+	_ = sheetsGetRangeCmd.MarkFlagRequired("sheet")
 	sheetsGetRangeCmd.Flags().StringVar(&sheetRange, "range", "", "The A1 notation of the range to retrieve")
-	sheetsGetRangeCmd.MarkFlagRequired("range")
+	_ = sheetsGetRangeCmd.MarkFlagRequired("range")
 
 	sheetsUpdateRangeCmd.Flags().StringVar(&sheetName, "sheet", "", "Name of the sheet")
-	sheetsUpdateRangeCmd.MarkFlagRequired("sheet")
+	_ = sheetsUpdateRangeCmd.MarkFlagRequired("sheet")
 	sheetsUpdateRangeCmd.Flags().StringVar(&sheetRange, "range", "", "The A1 notation of the range to update")
-	sheetsUpdateRangeCmd.MarkFlagRequired("range")
+	_ = sheetsUpdateRangeCmd.MarkFlagRequired("range")
 }

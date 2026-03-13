@@ -1,6 +1,10 @@
 # drivectl
 
-A command-line tool for interacting with the Google Drive API.
+An experimental command-line tool for interacting with the Google Drive API.
+
+
+Please review either the [Gemini CLI Workspace Extension](https://github.com/gemini-cli-extensions/workspace) or the [Workspace CLI](https://github.com/googleworkspace/cli) for more up to date examples of interacting with Workspace.
+
 
 ## Features
 

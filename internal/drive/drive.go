@@ -54,35 +54,79 @@ func renderBodyAsText(body *docs.Body) string {
 	return text.String()
 }
 
+func findTab(tabs []*docs.Tab, tabId string) *docs.Tab {
+	for _, t := range tabs {
+		if t.TabProperties != nil && t.TabProperties.TabId == tabId {
+			return t
+		}
+		if len(t.ChildTabs) > 0 {
+			if found := findTab(t.ChildTabs, tabId); found != nil {
+				return found
+			}
+		}
+	}
+	return nil
+}
+
+func getDocumentTabContent(docsSvc *docs.Service, fileId string, tabId string) ([]byte, error) {
+	doc, err := docsSvc.Documents.Get(fileId).IncludeTabsContent(true).Do()
+	if err != nil {
+		return nil, fmt.Errorf("unable to retrieve document with tabs: %w", err)
+	}
+
+	if tab := findTab(doc.Tabs, tabId); tab != nil {
+		textContent := renderBodyAsText(tab.DocumentTab.Body)
+		return []byte(textContent), nil
+	}
+
+	return nil, fmt.Errorf("tab with id %s not found", tabId)
+}
+
+func exportGoogleAppsFile(driveSvc *drive.Service, fileId string, mimeType string, format string) ([]byte, error) {
+	exportMimeType, ok := formatMap[strings.ToLower(format)]
+	if !ok && format != "" {
+		return nil, fmt.Errorf("invalid format: %s. Valid formats are: pdf, docx, html, zip, epub, txt, md, csv, tsv, xlsx, ods, pptx, odp", format)
+	}
+
+	if mimeType == "application/vnd.google-apps.spreadsheet" {
+		if format == "" || format == "txt" {
+			exportMimeType = "text/csv"
+		}
+	} else if format == "" {
+		exportMimeType = "text/plain"
+	}
+
+	resp, err := driveSvc.Files.Export(fileId, exportMimeType).Download()
+	if err != nil {
+		return nil, fmt.Errorf("unable to export Google Doc: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read exported content: %w", err)
+	}
+	return body, nil
+}
+
+func downloadStandardFile(driveSvc *drive.Service, fileId string) ([]byte, error) {
+	resp, err := driveSvc.Files.Get(fileId).Download()
+	if err != nil {
+		return nil, fmt.Errorf("unable to download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read file content: %w", err)
+	}
+	return body, nil
+}
+
 // GetFile downloads a file or exports a Google Doc.
 func GetFile(driveSvc *drive.Service, docsSvc *docs.Service, fileId string, format string, tabId string) ([]byte, error) {
 	if tabId != "" {
-		doc, err := docsSvc.Documents.Get(fileId).IncludeTabsContent(true).Do()
-		if err != nil {
-			return nil, fmt.Errorf("unable to retrieve document with tabs: %w", err)
-		}
-
-		var findTab func(tabs []*docs.Tab) *docs.Tab
-		findTab = func(tabs []*docs.Tab) *docs.Tab {
-			for _, t := range tabs {
-				if t.TabProperties != nil && t.TabProperties.TabId == tabId {
-					return t
-				}
-				if len(t.ChildTabs) > 0 {
-					if found := findTab(t.ChildTabs); found != nil {
-						return found
-					}
-				}
-			}
-			return nil
-		}
-
-		if tab := findTab(doc.Tabs); tab != nil {
-			textContent := renderBodyAsText(tab.DocumentTab.Body)
-			return []byte(textContent), nil
-		}
-
-		return nil, fmt.Errorf("tab with id %s not found", tabId)
+		return getDocumentTabContent(docsSvc, fileId, tabId)
 	}
 
 	file, err := driveSvc.Files.Get(fileId).Fields("mimeType", "name").Do()
@@ -90,47 +134,11 @@ func GetFile(driveSvc *drive.Service, docsSvc *docs.Service, fileId string, form
 		return nil, fmt.Errorf("unable to retrieve file metadata: %w", err)
 	}
 
-	var content []byte
-
 	if strings.HasPrefix(file.MimeType, "application/vnd.google-apps") {
-		exportMimeType, ok := formatMap[strings.ToLower(format)]
-		if !ok && format != "" {
-			return nil, fmt.Errorf("invalid format: %s. Valid formats are: pdf, docx, html, zip, epub, txt, md, csv, tsv, xlsx, ods, pptx, odp", format)
-		}
-
-		if file.MimeType == "application/vnd.google-apps.spreadsheet" {
-			if format == "" || format == "txt" {
-				exportMimeType = "text/csv"
-			}
-		} else if format == "" {
-			exportMimeType = "text/plain"
-		}
-
-		resp, err := driveSvc.Files.Export(fileId, exportMimeType).Download()
-		if err != nil {
-			return nil, fmt.Errorf("unable to export Google Doc: %w", err)
-		}
-		defer resp.Body.Close()
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read exported content: %w", err)
-		}
-		content = body
-	} else {
-		resp, err := driveSvc.Files.Get(fileId).Download()
-		if err != nil {
-			return nil, fmt.Errorf("unable to download file: %w", err)
-		}
-		defer resp.Body.Close()
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read file content: %w", err)
-		}
-		content = body
+		return exportGoogleAppsFile(driveSvc, fileId, file.MimeType, format)
 	}
-	return content, nil
+
+	return downloadStandardFile(driveSvc, fileId)
 }
 
 // DescribeFile shows detailed metadata for a specific file.
