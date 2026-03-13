@@ -1,0 +1,46 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - id: "drivectl"
+    main: .
+    binary: drivectl
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      # Inject the git tag version into the cmd.Version variable we created earlier
+      - -s -w -X github.com/ghchinoy/drivectl/cmd.Version={{.Version}}
+
+archives:
+  - format: tar.gz
+    # this name template makes the OS and Arch clean
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+release:
+  github:
+    owner: ghchinoy
+    name: drivectl
