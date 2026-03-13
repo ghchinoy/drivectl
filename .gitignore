@@ -42,4 +42,6 @@ plans/
 
 # Dolt database files (added by bd init)
 .dolt/
+dolt/
+dolt-server.*
 *.db
