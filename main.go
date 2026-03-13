@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/ghchinoy/drivectl/cmd"
+	"github.com/ghchinoy/drivectl/internal/ui"
 )
 
 // main is the entry point of the application.
@@ -44,9 +45,11 @@ func main() {
 		}
 	}
 
+	var err error
 	if mcp || mcpHTTP != "" {
-		cmd.ExecuteMCP(mcpHTTP)
+		err = cmd.ExecuteMCP(mcpHTTP)
 	} else {
-		cmd.Execute()
+		err = cmd.ExecuteError()
 	}
+	ui.HandleError(err)
 }

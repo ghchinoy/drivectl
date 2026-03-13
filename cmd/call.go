@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/ghchinoy/drivectl/internal/discovery"
+	"github.com/ghchinoy/drivectl/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -18,8 +19,9 @@ var (
 )
 
 var callCmd = &cobra.Command{
-	Use:   "call [service.resource.method]",
-	Short: "Call an arbitrary Google API endpoint dynamically",
+	Use:     "call [service.resource.method]",
+	GroupID: GroupAdvanced,
+	Short:   "Call an arbitrary Google API endpoint dynamically",
 	Long: `Fetches the Google API Discovery Document for the specified service, validates
 the provided JSON payload (if any), and executes the API call dynamically.
 
@@ -32,7 +34,7 @@ Example:
 		path := args[0]
 		parts := strings.Split(path, ".")
 		if len(parts) < 4 {
-			return fmt.Errorf("path must be in the format 'service.version.resource.method' (e.g. drive.v3.files.list)")
+			return ui.ErrorWithHint(fmt.Errorf("invalid path format"), "Path must be in the format 'service.version.resource.method' (e.g. drive.v3.files.list)")
 		}
 
 		serviceName := parts[0]
@@ -42,12 +44,12 @@ Example:
 
 		doc, err := discovery.FetchDiscoveryDocument(client, serviceName, version)
 		if err != nil {
-			return fmt.Errorf("failed to fetch discovery document: %w", err)
+			return ui.ErrorWithHint(fmt.Errorf("failed to fetch discovery document: %w", err), "Ensure your network is active and the API service/version exist.")
 		}
 
 		method, err := findMethod(doc, resourcePath, methodName)
 		if err != nil {
-			return err
+			return ui.ErrorWithHint(err, "Double check the resource and method names against the Google API documentation.")
 		}
 
 		// Prepare the URL
@@ -114,17 +116,17 @@ Example:
 
 		resp, err := client.Do(req)
 		if err != nil {
-			return fmt.Errorf("API request failed: %w", err)
+			return ui.ErrorWithHint(fmt.Errorf("API request failed: %w", err), "Check your network connection and payload formatting.")
 		}
 		defer resp.Body.Close()
 
 		respBody, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return fmt.Errorf("failed to read response: %w", err)
+			return ui.ErrorWithHint(fmt.Errorf("failed to read response: %w", err), "The server returned an unreadable response.")
 		}
 
 		if resp.StatusCode >= 400 {
-			return fmt.Errorf("API error (HTTP %d): %s", resp.StatusCode, string(respBody))
+			return ui.ErrorWithHint(fmt.Errorf("API error (HTTP %d): %s", resp.StatusCode, string(respBody)), "Read the Google API error message above to correct your request.")
 		}
 
 		// Pretty print JSON response

@@ -8,14 +8,16 @@ import (
 	"path/filepath"
 
 	"github.com/ghchinoy/drivectl/internal/drive"
+	"github.com/ghchinoy/drivectl/internal/ui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var authCmd = &cobra.Command{
-	Use:   "auth",
-	Short: "Authentication commands",
-	Long:  `Manage authentication state for drivectl.`,
+	Use:     "auth",
+	GroupID: GroupAuth,
+	Short:   "Authentication commands",
+	Long:    `Manage authentication state for drivectl.`,
 }
 
 var authLoginCmd = &cobra.Command{
@@ -24,6 +26,7 @@ var authLoginCmd = &cobra.Command{
 	Long: `Login to Google Drive using OAuth2.
 This command will open your browser to authenticate with Google.
 It will save the credentials to a local configuration directory for future use.`,
+	Example: `  drivectl auth login --secret-file ./client_secret.json`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		secretFile := viper.GetString("secret-file")
 		
@@ -69,10 +72,10 @@ It will save the credentials to a local configuration directory for future use.`
 		// We pass targetSecretFile to explicitly use the cached one
 		_, err = drive.NewOAuthClient(ctx, targetSecretFile, noBrowserAuth)
 		if err != nil {
-			return fmt.Errorf("login failed: %w", err)
+			return ui.ErrorWithHint(fmt.Errorf("login failed: %w", err), "Ensure your client_secret.json is valid and the browser flow completed.")
 		}
 
-		fmt.Println("Login successful! You can now run drivectl commands.")
+		ui.PrintSuccess("Login successful! You can now run drivectl commands.")
 		return nil
 	},
 }

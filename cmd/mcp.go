@@ -15,16 +15,10 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/ghchinoy/drivectl/mcp"
 )
 
 // ExecuteMCP starts the MCP server.
-func ExecuteMCP(httpAddr string) {
-	if err := mcp.Start(rootCmd, httpAddr); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+func ExecuteMCP(httpAddr string) error {
+	return mcp.Start(rootCmd, httpAddr)
 }

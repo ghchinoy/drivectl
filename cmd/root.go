@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/ghchinoy/drivectl/internal/drive"
+	"github.com/ghchinoy/drivectl/internal/ui"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"google.golang.org/api/docs/v1"
@@ -16,6 +17,8 @@ import (
 )
 
 var (
+	// Version is the current version of the application, injected at build time.
+	Version = "dev"
 	// noBrowserAuth is a flag to disable opening the browser for authentication.
 	noBrowserAuth bool
 	// client is the HTTP client used for all API calls.
@@ -28,15 +31,24 @@ var (
 	sheetsSvc *sheets.Service
 )
 
+// Command Groups
+const (
+	GroupAuth        = "auth"
+	GroupCore        = "core"
+	GroupIntegration = "integration"
+	GroupAdvanced    = "advanced"
+)
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "drivectl",
-	Short: "A CLI for Google Drive and Docs.",
+	Use:     "drivectl",
+	Version: Version,
+	Short:   "A CLI for Google Drive and Docs.",
 	Long: `drivectl is a powerful command-line tool for interacting with your Google Drive files.
 It allows you to list, describe, and download files, with advanced support for
 Google Docs, including exporting to multiple formats and accessing individual tabs.`, 
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if cmd.Name() == "login" || cmd.Name() == "auth" {
+		if cmd.Name() == "login" || cmd.Name() == "auth" || cmd.Name() == "help" {
 			return nil
 		}
 		secretFile := viper.GetString("secret-file")
@@ -45,7 +57,7 @@ Google Docs, including exporting to multiple formats and accessing individual ta
 		var err error
 		client, err = drive.NewOAuthClient(ctx, secretFile, noBrowserAuth)
 		if err != nil {
-			return fmt.Errorf("could not create oauth client. Have you run 'drivectl auth login'? Error: %w", err)
+			return ui.ErrorWithHint(fmt.Errorf("could not create oauth client: %w", err), "run 'drivectl auth login' to authenticate")
 		}
 
 		driveSvc, err = googledrive.NewService(ctx, option.WithHTTPClient(client))
@@ -75,7 +87,17 @@ func Execute() {
 	}
 }
 
+// ExecuteError executes the root command and returns any errors to the caller.
+func ExecuteError() error {
+	return rootCmd.Execute()
+}
+
 func init() {
+	rootCmd.AddGroup(&cobra.Group{ID: GroupAuth, Title: "Authentication Commands:"})
+	rootCmd.AddGroup(&cobra.Group{ID: GroupCore, Title: "Core Commands:"})
+	rootCmd.AddGroup(&cobra.Group{ID: GroupIntegration, Title: "Integration Commands:"})
+	rootCmd.AddGroup(&cobra.Group{ID: GroupAdvanced, Title: "Advanced Commands:"})
+
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().String("secret-file", "", "path to your client secrets file")
 	rootCmd.PersistentFlags().BoolVar(&noBrowserAuth, "no-browser-auth", false, "do not open a browser for authentication")

@@ -7,6 +7,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/ghchinoy/drivectl/internal/drive"
+	"github.com/ghchinoy/drivectl/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -17,23 +18,25 @@ var (
 )
 
 var sheetsCmd = &cobra.Command{
-	Use:   "sheets",
-	Short: "Interact with Google Sheets",
-	Long:  `A set of commands to interact with Google Sheets.`,
+	Use:     "sheets",
+	GroupID: GroupIntegration,
+	Short:   "Interact with Google Sheets",
+	Long:    `A set of commands to interact with Google Sheets.`,
 }
 
 var sheetsListCmd = &cobra.Command{
-	Use:   "list [spreadsheetId]",
-	Short: "Lists the sheets in a spreadsheet.",
-	Long:  `Lists all the individual sheets (tabs) within a given spreadsheet.`,
-	Args:  cobra.ExactArgs(1),
+	Use:     "list [spreadsheetId]",
+	Short:   "Lists the sheets in a spreadsheet.",
+	Long:    `Lists all the individual sheets (tabs) within a given spreadsheet.`,
+	Example: `  drivectl sheets list <spreadsheet-id>`,
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		spreadsheetId := args[0]
 		sheets, err := drive.ListSheets(sheetsSvc, spreadsheetId)
 		if err != nil {
-			return err
+			return ui.ErrorWithHint(err, "Ensure the spreadsheet ID is correct.")
 		}
-		fmt.Println("Sheets:")
+		fmt.Println(ui.Accent("Sheets:"))
 		for _, sheet := range sheets {
 			fmt.Println(sheet)
 		}
@@ -42,23 +45,24 @@ var sheetsListCmd = &cobra.Command{
 }
 
 var sheetsGetCmd = &cobra.Command{
-	Use:   "get [spreadsheetId]",
-	Short: "Gets a sheet as CSV.",
-	Long:  `Retrieves the entire content of a specified sheet and outputs it as CSV. An optional output file can be specified.`,
-	Args:  cobra.ExactArgs(1),
+	Use:     "get [spreadsheetId]",
+	Short:   "Gets a sheet as CSV.",
+	Long:    `Retrieves the entire content of a specified sheet and outputs it as CSV. An optional output file can be specified.`,
+	Example: `  drivectl sheets get <spreadsheet-id> --sheet Sheet1`,
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		spreadsheetId := args[0]
 		csv, err := drive.GetSheetAsCSV(sheetsSvc, spreadsheetId, sheetName)
 		if err != nil {
-			return err
+			return ui.ErrorWithHint(err, "Check if the sheet name exists in the given spreadsheet ID.")
 		}
 
 		if sheetsOutputFile != "" {
 			err := os.WriteFile(sheetsOutputFile, []byte(csv), 0644)
 			if err != nil {
-				return fmt.Errorf("failed to write to output file %s: %w", sheetsOutputFile, err)
+				return ui.ErrorWithHint(fmt.Errorf("failed to write to output file %s: %w", sheetsOutputFile, err), "Check file path permissions.")
 			}
-			fmt.Printf("Successfully saved sheet to %s\n", sheetsOutputFile)
+			ui.PrintSuccess("Saved sheet to %s", sheetsOutputFile)
 		} else {
 			fmt.Println(csv)
 		}
@@ -67,15 +71,16 @@ var sheetsGetCmd = &cobra.Command{
 }
 
 var sheetsGetRangeCmd = &cobra.Command{
-	Use:   "get-range [spreadsheetId]",
-	Short: "Gets a specific range from a sheet.",
-	Long:  `Retrieves a specific range of cells from a sheet, specified using A1 notation.`,
-	Args:  cobra.ExactArgs(1),
+	Use:     "get-range [spreadsheetId]",
+	Short:   "Gets a specific range from a sheet.",
+	Long:    `Retrieves a specific range of cells from a sheet, specified using A1 notation.`,
+	Example: `  drivectl sheets get-range <spreadsheet-id> --sheet Sheet1 --range A1:C10`,
+	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		spreadsheetId := args[0]
 		values, err := drive.GetSheetRange(sheetsSvc, spreadsheetId, sheetName, sheetRange)
 		if err != nil {
-			return err
+			return ui.ErrorWithHint(err, "Verify the A1 notation of the range (e.g. A1:B2).")
 		}
 
 		w := new(tabwriter.Writer)
@@ -95,19 +100,20 @@ var sheetsGetRangeCmd = &cobra.Command{
 }
 
 var sheetsUpdateRangeCmd = &cobra.Command{
-	Use:   "update-range [spreadsheetId] [value]",
-	Short: "Updates a specific range in a sheet.",
-	Long:  `Updates a specific cell or range of cells within a sheet, specified using A1 notation.`,
-	Args:  cobra.ExactArgs(2),
+	Use:     "update-range [spreadsheetId] [value]",
+	Short:   "Updates a specific range in a sheet.",
+	Long:    `Updates a specific cell or range of cells within a sheet, specified using A1 notation.`,
+	Example: `  drivectl sheets update-range <spreadsheet-id> "Done" --sheet Sheet1 --range B2`,
+	Args:    cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		spreadsheetId := args[0]
 		value := args[1]
 		values := [][]interface{}{{value}}
 		err := drive.UpdateSheetRange(sheetsSvc, spreadsheetId, sheetName, sheetRange, values)
 		if err != nil {
-			return err
+			return ui.ErrorWithHint(err, "Verify the A1 notation of the range and that you have write permissions.")
 		}
-		fmt.Println("Sheet updated successfully.")
+		ui.PrintSuccess("Sheet updated successfully.")
 		return nil
 	},
 }

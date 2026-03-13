@@ -20,20 +20,23 @@ import (
 	"fmt"
 
 	"github.com/ghchinoy/drivectl/internal/drive"
+	"github.com/ghchinoy/drivectl/internal/ui"
 	"github.com/spf13/cobra"
 )
 
 var describeCmd = &cobra.Command{
-	Use:   "describe [fileId]",
-	Short: "Shows detailed metadata for a specific file.",
-	Long:  `Retrieves and displays all available metadata for a given file ID from the Google Drive API. The output is formatted as a JSON object.`,
+	Use:     "describe [fileId]",
+	GroupID: GroupCore,
+	Short:   "Shows detailed metadata for a specific file.",
+	Long:    `Retrieves and displays all available metadata for a given file ID from the Google Drive API. The output is formatted as a JSON object.`,
+	Example: `  drivectl describe <file-id>`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fileId := args[0]
 
 		file, err := drive.DescribeFile(driveSvc, fileId)
 		if err != nil {
-			return err
+			return ui.ErrorWithHint(err, "Ensure the file ID is correct and you have permission to access it.")
 		}
 
 		jsonFile, err := json.MarshalIndent(file, "", "  ")

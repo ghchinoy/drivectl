@@ -19,6 +19,7 @@ import (
 	"os"
 
 	"github.com/ghchinoy/drivectl/internal/drive"
+	"github.com/ghchinoy/drivectl/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -29,12 +30,16 @@ var (
 )
 
 var getCmd = &cobra.Command{
-	Use:   "get [fileId]",
-	Short: "Downloads a file or exports a Google Doc.",
+	Use:     "get [fileId]",
+	GroupID: GroupCore,
+	Short:   "Downloads a file or exports a Google Doc.",
 	Long: `Downloads a file from Google Drive.
 For standard files (PDFs, images, etc.), it downloads the raw content.
 For Google Docs, it can export the entire document to various formats (txt, md, pdf, etc.) using the --format flag.
 It can also extract the plain text content of a single tab from a Google Doc using the --tab-id flag.`,
+	Example: `  drivectl get <file-id>
+  drivectl get <google-doc-id> --format md -o my-doc.md
+  drivectl get <google-doc-id> --tab-id <tab-id>`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fileId := args[0]
@@ -47,14 +52,14 @@ It can also extract the plain text content of a single tab from a Google Doc usi
 		if outputFile != "" {
 			err := os.WriteFile(outputFile, content, 0644)
 			if err != nil {
-				return fmt.Errorf("failed to write to output file %s: %w", outputFile, err)
+				return ui.ErrorWithHint(fmt.Errorf("failed to write to output file %s: %w", outputFile, err), "Check file permissions and path.")
 			}
-			fmt.Printf("Successfully saved file to %s\n", outputFile)
+			ui.PrintSuccess("Saved file to %s", outputFile)
 		} else {
 			// For binary formats like pdf, docx, etc., printing to console is not useful.
 			// We will just print a success message instead.
 			if format != "" && format != "txt" && format != "html" && format != "md" {
-				fmt.Printf("Successfully downloaded file content. Use the -o flag to save it to a file.\n")
+				ui.PrintSuccess("Downloaded file content. Use the -o flag to save it to a file.")
 			} else {
 				fmt.Println(string(content))
 			}

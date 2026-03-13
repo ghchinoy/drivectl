@@ -229,8 +229,8 @@ func executeDynamicCall(ctx context.Context, endpoint string, doc *discovery.Res
 
 	// Add the auth header explicitly using the client context (which handles token refresh)
 	driveSvc, err := googledrive.NewService(ctx, option.WithHTTPClient(client))
-	if err == nil {
-		// Just a dummy call to ensure token is valid/refreshed, wait, client.Do() handles it
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate token client: %w", err)
 	}
 	_ = driveSvc
 
