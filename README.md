@@ -2,16 +2,16 @@
 
 An experimental command-line tool for interacting with the Google Drive API.
 
-
-Please review either the [Gemini CLI Workspace Extension](https://github.com/gemini-cli-extensions/workspace) or the [Workspace CLI](https://github.com/googleworkspace/cli) for more up to date examples of interacting with Workspace.
-
+Please review either the [Gemini CLI Workspace Extension](https://github.com/gemini-cli-extensions/workspace) or the [Workspace CLI](https://github.com/googleworkspace/cli) for more up-to-date examples of interacting with Workspace.
 
 ## Features
 
-*   List files with powerful query capabilities.
-*   Describe file metadata.
-*   Download files, with special handling for Google Docs (converts to plain text).
-*   Simple and secure OAuth 2.0 authentication flow.
+*   **Robust Authentication:** Secure OAuth 2.0 login with automatic local caching and silent token refreshing.
+*   **Dynamic API Capabilities:** A generic `call` subcommand powered by Google API Discovery Documents to hit *any* Google Workspace endpoint dynamically.
+*   **Google Drive Integration:** List files with powerful query capabilities, describe file metadata, and download files.
+*   **Google Docs Integration:** Convert Markdown files into richly formatted Google Docs, export Docs to text/markdown/PDF, and manage document tabs.
+*   **Google Sheets Integration:** Export sheets to CSV, read explicit cell ranges via A1 notation, and update cell values.
+*   **MCP Server Mode:** Run `drivectl` as an MCP server to expose Workspace interactions directly to LLM agents.
 
 ## Installation
 
@@ -31,23 +31,46 @@ Please review either the [Gemini CLI Workspace Extension](https://github.com/gem
 4.  Search for and enable the following APIs:
     *   **Google Drive API**
     *   **Google Docs API**
+    *   **Google Sheets API**
 5.  Go to **APIs & Services > Credentials**.
 6.  Click **Create Credentials > OAuth client ID**.
 7.  Select **Desktop app** as the application type.
 8.  Give it a name (e.g., "drivectl").
 9.  Click **Create**. A window will appear with your client ID and client secret. Click **Download JSON**.
-10. Rename the downloaded file to `client_secret.json`.
-11. Place this file in a secure location. You will need to provide the path to this file using the `--secret-file` flag or by setting the `DRIVE_SECRETS` environment variable.
+10. Rename the downloaded file to `client_secret.json` and keep it handy for your first login.
 
 ## Usage
 
 ### First-time Authentication
 
-The first time you run any command, `drivectl` will open a browser window for you to authorize access to your Google Drive account. After you grant access, your browser will be redirected to a page that says "Authentication successful!". You can then close the browser window. Your authentication token will be stored securely for future use.
+`drivectl` handles authentication robustly. You only need to provide your client secret file once. The CLI will cache the secrets and your authorization tokens locally in `~/.config/drivectl/`, automatically refreshing your session in the background as needed.
 
-If you are on a system without a graphical browser, you can use the `--no-browser-auth` flag. This will print a URL to the console, which you can open on another machine. You will then need to copy the authorization code from the browser and paste it back into the terminal.
+To authenticate for the first time, run:
 
-### Commands
+```bash
+./drivectl auth login --secret-file /path/to/your/client_secret.json
+```
+
+This will automatically open your default browser. Once you grant permissions, you can return to your terminal. All subsequent commands can be run without passing the `--secret-file` flag!
+
+*(If you are on a headless system, you can use the `--no-browser-auth` flag to print a manual authorization URL).*
+
+### Dynamic Discovery Calls
+
+You can dynamically execute *any* Google API endpoint using the `call` subcommand. It fetches the latest Google Discovery schema to build the request.
+
+```bash
+# List files using the generic discovery caller
+./drivectl call drive.v3.files.list --payload '{"pageSize": 5}'
+
+# Fetch specific fields for a known file
+./drivectl call drive.v3.files.get --payload '{"fileId": "YOUR_FILE_ID", "fields": "name,mimeType"}'
+
+# Create a new Google Doc
+./drivectl call docs.v1.documents.create --payload '{"title": "My New Document"}'
+```
+
+### Core Commands
 
 **List files**
 
@@ -58,99 +81,60 @@ If you are on a system without a graphical browser, you can use the `--no-browse
 # List up to 20 files
 ./drivectl list --limit 20
 
-# List all Google Docs
+# List all Google Docs using Drive query syntax
 ./drivectl list -q "mimeType='application/vnd.google-apps.document'"
-
-# List all files containing "MyProject" in the name
-./drivectl list -q "name contains 'MyProject'"
 ```
 
-The `--query` (`-q`) flag uses the Google Drive API's query language. You can build powerful and specific queries. For more details on the query syntax, see the [official Google Drive documentation](https://developers.google.com/drive/api/v3/search-files).
-
-**Describe a file**
+**Get file content**
 
 ```bash
-# Get detailed metadata for a file
-./drivectl describe <file-id>
-```
-
-**List tabs in a document**
-
-```bash
-# List the tabs by their index number
-./drivectl tabs <document-id>
-```
-
-**Get a file or tab content**
-
-```bash
-# Get the content of a file and print it to the console
+# Download a file to stdout
 ./drivectl get <file-id>
-
-# Get a Google Doc and save it as a text file (default format)
-./drivectl get <google-doc-id> -o my-document.txt
 
 # Export a Google Doc as Markdown
 ./drivectl get <google-doc-id> --format md -o my-document.md
-
-# Export a Google Doc as a PDF
-./drivectl get <google-doc-id> --format pdf -o my-document.pdf
-
-# Get the content of a specific tab (e.g., the first tab)
-./drivectl get <google-doc-id> --tab-index 0
-
-# Download a regular file (e.g., a PDF)
-./drivectl get <pdf-file-id> -o my-file.pdf
 ```
 
-### Google Sheets and Docs
+### Google Docs & Sheets
 
-**List sheets in a spreadsheet**
+**Create a Google Doc from Markdown**
 
 ```bash
-./drivectl sheets list <spreadsheet-id>
+# Converts the markdown file into a formatted Google Doc
+./drivectl docs create "My New Design Doc" ./docs/design.md
 ```
 
-**Get a sheet as CSV**
+**List Google Doc Tabs**
 
 ```bash
-./drivectl sheets get <spreadsheet-id> --sheet <sheet-name>
-```
-
-**Get a specific range from a sheet**
-
-```bash
-./drivectl sheets get-range <spreadsheet-id> --sheet <sheet-name> --range <A1-notation>
-```
-
-**Update a specific range in a sheet**
-
-```bash
-./drivectl sheets update-range <spreadsheet-id> <value> --sheet <sheet-name> --range <A1-notation>
-```
-
-**List tabs in a document**
-
-```bash
+# View the structural hierarchy of tabs in a Doc
 ./drivectl docs tabs <document-id>
 ```
 
+**Interact with Google Sheets**
+
+```bash
+# Export a sheet as a CSV
+./drivectl sheets get <spreadsheet-id> --sheet "Sheet1"
+
+# Get values using A1 notation
+./drivectl sheets get-range <spreadsheet-id> --sheet "Sheet1" --range "A1:C5"
+
+# Update a specific cell
+./drivectl sheets update-range <spreadsheet-id> "New Value" --sheet "Sheet1" --range "B2"
+```
 
 ## MCP Server Mode
 
-`drivectl` can also be run as an MCP server, exposing its commands as tools that can be called by an MCP client.
+`drivectl` can also be run as an MCP server, exposing its commands as tools that can be called by an MCP client (like Gemini).
 
 ### Starting the Server
 
-You can start the MCP server in two modes:
-
-**Stdio Mode:**
+**Stdio Mode (Default for Agents):**
 
 ```bash
 ./drivectl --mcp
 ```
-
-This will start the server on the standard input/output.
 
 **HTTP Mode:**
 
@@ -158,32 +142,9 @@ This will start the server on the standard input/output.
 ./drivectl --mcp-http :8080
 ```
 
-This will start the server on port 8080.
-
-### Interacting with the Server
-
-You can use the `mcptools` CLI to interact with the server.
-
-**List available tools:**
-
-```bash
-mcptools tools ./drivectl --mcp
-```
-
-**Call a tool:**
-
-```bash
-# List files
-mcptools call list ./drivectl --mcp
-
-# Get a file
-mcptools call get -p '{"file-id": "<your-file-id>"}' ./drivectl --mcp
-```
-
 ## Gemini CLI Configuration
 
-This repository contains a sample `settings.json.sample` file. To use this tool with the Gemini CLI, you should copy this file to `.gemini/settings.json` in your project root and replace the placeholder values with your actual credentials.
-
+This repository contains a sample `settings.json.sample` file. To use this tool with the Gemini CLI, you should copy this file to `.gemini/settings.json` in your project root and replace the placeholder values with your actual configuration.
 
 # License
 
@@ -193,4 +154,3 @@ Apache-2.0
 
 > [!CAUTION]
 > This is **not** an officially supported Google product.
-
