@@ -7,11 +7,13 @@ Please review either the [Gemini CLI Workspace Extension](https://github.com/gem
 ## Features
 
 *   **Robust Authentication:** Secure OAuth 2.0 login with automatic local caching and silent token refreshing.
+*   **Agent-Friendly UX:** Thoughtful CLI design with semantic command grouping, color-coded output, proactive error hints, and deterministic JSON formatting (`-O json`) to simplify LLM integration and scripting.
 *   **Dynamic API Capabilities:** A generic `call` subcommand powered by Google API Discovery Documents to hit *any* Google Workspace endpoint dynamically.
 *   **Google Drive Integration:** List files with powerful query capabilities, describe file metadata, and download files.
-*   **Google Docs Integration:** Convert Markdown files into richly formatted Google Docs, export Docs to text/markdown/PDF, and manage document tabs.
+*   **Google Docs Integration:** Convert Markdown files into richly formatted Google Docs, export Docs back to raw Markdown (parsing the AST), PDF, or plain text, and manage document tabs.
 *   **Google Sheets Integration:** Export sheets to CSV, read explicit cell ranges via A1 notation, and update cell values.
-*   **MCP Server Mode:** Run `drivectl` as an MCP server to expose Workspace interactions directly to LLM agents.
+*   **Composable Recipes:** Execute sequences of CLI commands defined in JSON files via `drivectl run` for complex, automated workflows.
+*   **MCP Server Mode:** Run `drivectl` as an MCP server to expose Workspace interactions directly to LLM agents using Discovery-driven schemas.
 
 ## Installation
 
@@ -122,6 +124,37 @@ You can dynamically execute *any* Google API endpoint using the `call` subcomman
 
 # Update a specific cell
 ./drivectl sheets update-range <spreadsheet-id> "New Value" --sheet "Sheet1" --range "B2"
+```
+
+### Advanced Workflows
+
+**Deterministic JSON Output**
+
+All commands support a `-O json` flag to bypass terminal UI formatting and emit pure, parseable JSON for shell pipelines or AI agents.
+
+```bash
+# Get structured JSON output of Drive files
+./drivectl list -q "name contains 'Project'" -O json
+```
+
+**Executing CLI Recipes**
+
+You can string multiple `drivectl` commands together using a JSON recipe file to automate redundant tasks.
+
+```bash
+# Run the sequential steps defined in a recipe
+./drivectl run recipes/sample.json
+```
+
+*Example Recipe (`recipes/sample.json`):*
+```json
+{
+  "name": "Quick Diagnostics",
+  "description": "Lists recent documents.",
+  "steps": [
+    ["list", "--limit", "2"]
+  ]
+}
 ```
 
 ## MCP Server Mode
