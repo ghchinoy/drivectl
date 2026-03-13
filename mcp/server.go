@@ -1,22 +1,24 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
+	"github.com/ghchinoy/drivectl/internal/discovery"
 	"github.com/ghchinoy/drivectl/internal/drive"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"google.golang.org/api/docs/v1"
 	googledrive "google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
-	"google.golang.org/api/sheets/v4"
 )
 
 const driveQueryCheatSheet = `
@@ -35,117 +37,23 @@ Examples:
 - Sheet1!A1:B2 refers to the range A1:B2 on the sheet named "Sheet1".
 `
 
-// getDriveSvc creates a new Google Drive service client.
-func getDriveSvc(ctx context.Context) (*googledrive.Service, error) {
+// getHTTPClient creates an authenticated HTTP client for API requests.
+func getHTTPClient(ctx context.Context) (*http.Client, error) {
 	viper.AutomaticEnv()
 	secretFile := viper.GetString("secret-file")
 	if secretFile == "" {
-		return nil, fmt.Errorf("client secret file not set. Please use the --secret-file flag or set the DRIVE_SECRETS environment variable")
+		configDir, err := drive.ConfigDir()
+		if err == nil {
+			// fallback to default
+			secretFile = configDir + "/client_secret.json"
+		}
 	}
 	noBrowserAuth := viper.GetBool("no-browser-auth")
 	client, err := drive.NewOAuthClient(ctx, secretFile, noBrowserAuth)
 	if err != nil {
 		return nil, fmt.Errorf("could not create oauth client: %w", err)
 	}
-	driveSvc, err := googledrive.NewService(ctx, option.WithHTTPClient(client))
-	if err != nil {
-		return nil, fmt.Errorf("could not create drive service: %w", err)
-	}
-	return driveSvc, nil
-}
-
-// getDocsSvc creates a new Google Docs service client.
-func getDocsSvc(ctx context.Context) (*docs.Service, error) {
-	viper.AutomaticEnv()
-	secretFile := viper.GetString("secret-file")
-	if secretFile == "" {
-		return nil, fmt.Errorf("client secret file not set. Please use the --secret-file flag or set the DRIVE_SECRETS environment variable")
-	}
-	noBrowserAuth := viper.GetBool("no-browser-auth")
-	client, err := drive.NewOAuthClient(ctx, secretFile, noBrowserAuth)
-	if err != nil {
-		return nil, fmt.Errorf("could not create oauth client: %w", err)
-	}
-	docsSvc, err := docs.NewService(ctx, option.WithHTTPClient(client))
-	if err != nil {
-		return nil, fmt.Errorf("could not create docs service: %w", err)
-	}
-	return docsSvc, nil
-}
-
-// getSheetsSvc creates a new Google Sheets service client.
-func getSheetsSvc(ctx context.Context) (*sheets.Service, error) {
-	viper.AutomaticEnv()
-	secretFile := viper.GetString("secret-file")
-	if secretFile == "" {
-		return nil, fmt.Errorf("client secret file not set. Please use the --secret-file flag or set the DRIVE_SECRETS environment variable")
-	}
-	noBrowserAuth := viper.GetBool("no-browser-auth")
-	client, err := drive.NewOAuthClient(ctx, secretFile, noBrowserAuth)
-	if err != nil {
-		return nil, fmt.Errorf("could not create oauth client: %w", err)
-	}
-	sheetsSvc, err := sheets.NewService(ctx, option.WithHTTPClient(client))
-	if err != nil {
-		return nil, fmt.Errorf("could not create sheets service: %w", err)
-	}
-	return sheetsSvc, nil
-}
-
-// ListArgs defines the arguments for the list tool.
-type ListArgs struct {
-	Limit int64  `json:"limit"`
-	Query string `json:"query"`
-}
-
-// GetArgs defines the arguments for the get tool.
-type GetArgs struct {
-	FileID string `json:"file-id"`
-	Format string `json:"format"`
-	TabID  string `json:"tab-id"`
-}
-
-// DescribeArgs defines the arguments for the describe tool.
-type DescribeArgs struct {
-	FileID string `json:"file-id"`
-}
-
-// TabsArgs defines the arguments for the tabs tool.
-type TabsArgs struct {
-	DocumentID string `json:"document-id"`
-}
-
-// DocsCreateArgs defines the arguments for the docs create tool.
-type DocsCreateArgs struct {
-	Title        string `json:"title"`
-	MarkdownFile string `json:"markdown_file,omitempty"`
-	MarkdownText string `json:"markdown_text,omitempty"`
-}
-
-// ListSheetsArgs defines the arguments for the sheets list tool.
-type ListSheetsArgs struct {
-	SpreadsheetID string `json:"spreadsheet-id"`
-}
-
-// GetSheetArgs defines the arguments for the sheets get tool.
-type GetSheetArgs struct {
-	SpreadsheetID string `json:"spreadsheet-id"`
-	SheetName     string `json:"sheet-name"`
-}
-
-// GetSheetRangeArgs defines the arguments for the sheets get-range tool.
-type GetSheetRangeArgs struct {
-	SpreadsheetID string `json:"spreadsheet-id"`
-	SheetName     string `json:"sheet-name"`
-	Range         string `json:"range"`
-}
-
-// UpdateSheetRangeArgs defines the arguments for the sheets update-range tool.
-type UpdateSheetRangeArgs struct {
-	SpreadsheetID string `json:"spreadsheet-id"`
-	SheetName     string `json:"sheet-name"`
-	Range         string `json:"range"`
-	Value         string `json:"value"`
+	return client, nil
 }
 
 // driveQueryCheatSheetHandler is a resource handler that returns a cheat sheet of Drive query examples.
@@ -174,76 +82,24 @@ func a1NotationCheatSheetHandler(ctx context.Context, ss *mcp.ServerSession, par
 	}, nil
 }
 
-func registerDocsTools(server *mcp.Server, command *cobra.Command) {
-	for _, subCmd := range command.Commands() {
-		switch subCmd.Name() {
-		case "tabs":
-			mcp.AddTool(server, &mcp.Tool{
-				Name:        "docs.tabs",
-				Description: subCmd.Long,
-			}, docsTabsHandler)
-		case "create":
-			mcp.AddTool(server, &mcp.Tool{
-				Name:        "docs.create",
-				Description: subCmd.Long,
-			}, docsCreateHandler)
-		}
-	}
+// Dynamic tools to expose via MCP. Format: service.version.resource.method
+var dynamicTools = []string{
+	"drive.v3.files.list",
+	"drive.v3.files.get",
+	"drive.v3.files.create",
+	"drive.v3.files.update",
+	"docs.v1.documents.create",
+	"docs.v1.documents.get",
+	"docs.v1.documents.batchUpdate",
+	"sheets.v4.spreadsheets.create",
+	"sheets.v4.spreadsheets.get",
+	"sheets.v4.spreadsheets.values.get",
+	"sheets.v4.spreadsheets.values.update",
 }
 
-func registerSheetsTools(server *mcp.Server, command *cobra.Command) {
-	for _, subCmd := range command.Commands() {
-		switch subCmd.Name() {
-		case "list":
-			mcp.AddTool(server, &mcp.Tool{
-				Name:        "sheets.list",
-				Description: subCmd.Long,
-			}, sheetsListHandler)
-		case "get":
-			mcp.AddTool(server, &mcp.Tool{
-				Name:        "sheets.get",
-				Description: subCmd.Long,
-			}, sheetsGetHandler)
-		case "get-range":
-			mcp.AddTool(server, &mcp.Tool{
-				Name:        "sheets.get-range",
-				Description: subCmd.Long,
-			}, sheetsGetRangeHandler)
-		case "update-range":
-			mcp.AddTool(server, &mcp.Tool{
-				Name:        "sheets.update-range",
-				Description: subCmd.Long,
-			}, sheetsUpdateRangeHandler)
-		}
-	}
-}
-
-func registerToolsAndResources(server *mcp.Server, rootCmd *cobra.Command) {
-	for _, cmd := range rootCmd.Commands() {
-		switch cmd.Name() {
-		case "list":
-			mcp.AddTool(server, &mcp.Tool{
-				Name:        cmd.Name(),
-				Description: cmd.Long,
-			}, listHandler)
-		case "get":
-			mcp.AddTool(server, &mcp.Tool{
-				Name:        cmd.Name(),
-				Description: cmd.Long,
-			}, getHandler)
-		case "describe":
-			mcp.AddTool(server, &mcp.Tool{
-				Name:        cmd.Name(),
-				Description: cmd.Long,
-			}, describeHandler)
-		case "docs":
-			registerDocsTools(server, cmd)
-		case "sheets":
-			registerSheetsTools(server, cmd)
-		}
-	}
-
-	// drive-query-cheat-sheet resource
+// registerToolsAndResources registers all dynamic API tools and local resources.
+func registerToolsAndResources(server *mcp.Server) error {
+	// Add Resources
 	server.AddResource(&mcp.Resource{
 		Name:        "drive-query-cheat-sheet",
 		Description: "A cheat sheet of example Google Drive query examples.",
@@ -251,20 +107,199 @@ func registerToolsAndResources(server *mcp.Server, rootCmd *cobra.Command) {
 		URI:         "embedded:drive-query-cheat-sheet",
 	}, driveQueryCheatSheetHandler)
 
-	// a1-notation-cheat-sheet
 	server.AddResource(&mcp.Resource{
 		Name:        "a1-notation-cheat-sheet",
 		Description: "A cheat sheet of example A1 notation for Google Sheets.",
 		MIMEType:    "text/plain",
 		URI:         "embedded:a1-notation-cheat-sheet",
 	}, a1NotationCheatSheetHandler)
+
+	// Fetch discovery docs for our key services to build exact input schemas
+	docsCache := make(map[string]*discovery.RestDescription)
+
+	for _, endpoint := range dynamicTools {
+		parts := strings.Split(endpoint, ".")
+		serviceName := parts[0]
+		version := parts[1]
+		cacheKey := serviceName + "_" + version
+
+		if _, ok := docsCache[cacheKey]; !ok {
+			doc, err := discovery.FetchDiscoveryDocument(http.DefaultClient, serviceName, version)
+			if err != nil {
+				log.Printf("Failed to fetch discovery doc for %s: %v", cacheKey, err)
+				continue
+			}
+			docsCache[cacheKey] = doc
+		}
+
+		doc := docsCache[cacheKey]
+		methodName := parts[len(parts)-1]
+		resourcePath := parts[2 : len(parts)-1]
+		
+		method, err := findMethod(doc, resourcePath, methodName)
+		if err != nil {
+			log.Printf("Failed to find method %s in %s: %v", endpoint, cacheKey, err)
+			continue
+		}
+
+		schema := discovery.MethodToSchema(method, doc)
+
+		// Create a local copy of endpoint and method for the closure
+		localEndpoint := endpoint
+		localMethod := method
+		localDoc := doc
+
+		mcpTool := &mcp.Tool{
+			Name:        localEndpoint,
+			Description: localMethod.Description,
+			InputSchema: schema,
+		}
+
+		mcp.AddTool(server, mcpTool, func(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[map[string]interface{}]) (*mcp.CallToolResultFor[any], error) {
+			return executeDynamicCall(ctx, localEndpoint, localDoc, localMethod, params.Arguments)
+		})
+		log.Printf("Registered MCP tool: %s", localEndpoint)
+	}
+
+	return nil
+}
+
+func executeDynamicCall(ctx context.Context, endpoint string, doc *discovery.RestDescription, method *discovery.RestMethod, parsed map[string]interface{}) (*mcp.CallToolResultFor[any], error) {
+	client, err := getHTTPClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	apiURL := doc.BaseURL + method.Path
+	if doc.BaseURL == "" {
+		apiURL = doc.RootURL + doc.ServicePath + method.Path
+	}
+
+	var reqBody io.Reader
+	if parsed != nil {
+		// Extract path parameters
+		for paramName, paramDef := range method.Parameters {
+			if paramDef.Location == "path" {
+				if val, ok := parsed[paramName]; ok {
+					valStr := fmt.Sprintf("%v", val)
+					apiURL = strings.Replace(apiURL, "{"+paramName+"}", url.PathEscape(valStr), -1)
+					delete(parsed, paramName)
+				} else if paramDef.Required {
+					return nil, fmt.Errorf("missing required path parameter: %s", paramName)
+				}
+			}
+		}
+
+		if method.Request == nil {
+			// Add remaining payload as query parameters
+			u, err := url.Parse(apiURL)
+			if err == nil {
+				q := u.Query()
+				for k, v := range parsed {
+					q.Set(k, fmt.Sprintf("%v", v))
+				}
+				u.RawQuery = q.Encode()
+				apiURL = u.String()
+			}
+		} else {
+			// Extract payload body if we nested it under "payload" to separate it from path params
+			var bodyData interface{} = parsed
+			if payloadObj, ok := parsed["payload"]; ok {
+				bodyData = payloadObj
+			}
+			jsonBytes, _ := json.Marshal(bodyData)
+			reqBody = bytes.NewReader(jsonBytes)
+		}
+	} else {
+		for paramName, paramDef := range method.Parameters {
+			if paramDef.Location == "path" && paramDef.Required {
+				return nil, fmt.Errorf("missing required path parameter: %s", paramName)
+			}
+		}
+	}
+
+	req, err := http.NewRequest(method.HTTPMethod, apiURL, reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if reqBody != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	// Add the auth header explicitly using the client context (which handles token refresh)
+	driveSvc, err := googledrive.NewService(ctx, option.WithHTTPClient(client))
+	if err == nil {
+		// Just a dummy call to ensure token is valid/refreshed, wait, client.Do() handles it
+	}
+	_ = driveSvc
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("API request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("API error (HTTP %d): %s", resp.StatusCode, string(respBody))
+	}
+
+	// Format output
+	var prettyJSON bytes.Buffer
+	var output string
+	if err := json.Indent(&prettyJSON, respBody, "", "  "); err != nil {
+		output = string(respBody)
+	} else {
+		output = prettyJSON.String()
+	}
+
+	return &mcp.CallToolResultFor[any]{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: output},
+		},
+	}, nil
+}
+
+func findMethod(doc *discovery.RestDescription, resourcePath []string, methodName string) (*discovery.RestMethod, error) {
+	if len(resourcePath) == 0 {
+		return nil, fmt.Errorf("resource path cannot be empty")
+	}
+
+	firstResourceName := resourcePath[0]
+	resource, ok := doc.Resources[firstResourceName]
+	if !ok {
+		return nil, fmt.Errorf("resource '%s' not found", firstResourceName)
+	}
+
+	currentResource := resource
+	for _, subName := range resourcePath[1:] {
+		subResource, ok := currentResource.Resources[subName]
+		if !ok {
+			return nil, fmt.Errorf("sub-resource '%s' not found", subName)
+		}
+		currentResource = subResource
+	}
+
+	method, ok := currentResource.Methods[methodName]
+	if !ok {
+		return nil, fmt.Errorf("method '%s' not found", methodName)
+	}
+
+	return &method, nil
 }
 
 // Start starts the MCP server.
 func Start(rootCmd *cobra.Command, httpAddr string) error {
 	server := mcp.NewServer(&mcp.Implementation{Name: "drivectl"}, nil)
 
-	registerToolsAndResources(server, rootCmd)
+	if err := registerToolsAndResources(server); err != nil {
+		return fmt.Errorf("failed to register tools: %w", err)
+	}
 
 	if httpAddr != "" {
 		handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
@@ -289,274 +324,4 @@ func Start(rootCmd *cobra.Command, httpAddr string) error {
 	}
 
 	return nil
-}
-
-// listHandler is the handler for the list tool.
-func listHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[ListArgs]) (*mcp.CallToolResultFor[any], error) {
-	driveSvc, err := getDriveSvc(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	limit := params.Arguments.Limit
-	if limit == 0 {
-		limit = 100
-	}
-	files, err := drive.ListFiles(driveSvc, limit, params.Arguments.Query)
-	if err != nil {
-		return nil, fmt.Errorf("unable to retrieve files: %w", err)
-	}
-
-	var output string
-	if len(files) == 0 {
-		output = "No files found."
-	} else {
-		for _, i := range files {
-			output += fmt.Sprintf("%s (%s)\n", i.Name, i.Id)
-		}
-	}
-
-	return &mcp.CallToolResultFor[any]{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: output},
-		},
-	}, nil
-}
-
-// getHandler is the handler for the get tool.
-func getHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[GetArgs]) (*mcp.CallToolResultFor[any], error) {
-	driveSvc, err := getDriveSvc(ctx)
-	if err != nil {
-		return nil, err
-	}
-	docsSvc, err := getDocsSvc(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	content, err := drive.GetFile(driveSvc, docsSvc, params.Arguments.FileID, params.Arguments.Format, params.Arguments.TabID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get file: %w", err)
-	}
-
-	return &mcp.CallToolResultFor[any]{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: string(content)},
-		},
-	}, nil
-}
-
-// describeHandler is the handler for the describe tool.
-func describeHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[DescribeArgs]) (*mcp.CallToolResultFor[any], error) {
-	if params.Arguments.FileID == "" {
-		return nil, fmt.Errorf("file-id is a required argument")
-	}
-
-	driveSvc, err := getDriveSvc(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	file, err := drive.DescribeFile(driveSvc, params.Arguments.FileID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to describe file: %w", err)
-	}
-
-	jsonFile, err := json.MarshalIndent(file, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("unable to marshal file to json: %w", err)
-	}
-
-	return &mcp.CallToolResultFor[any]{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: string(jsonFile)},
-		},
-	}, nil
-}
-
-// docsTabsHandler is the handler for the docs tabs tool.
-func docsTabsHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[TabsArgs]) (*mcp.CallToolResultFor[any], error) {
-	if params.Arguments.DocumentID == "" {
-		return nil, fmt.Errorf("document-id is a required argument")
-	}
-
-	docsSvc, err := getDocsSvc(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	tabs, err := drive.GetTabs(docsSvc, params.Arguments.DocumentID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get tabs: %w", err)
-	}
-
-	var tabStrings []string
-	var traverse func(tabs []*drive.TabInfo, level int)
-	traverse = func(tabs []*drive.TabInfo, level int) {
-		for _, tab := range tabs {
-			tabStrings = append(tabStrings, fmt.Sprintf("%s%s (%s)", strings.Repeat("\t", level), tab.Title, tab.TabID))
-			if len(tab.Children) > 0 {
-				traverse(tab.Children, level+1)
-			}
-		}
-	}
-	traverse(tabs, 0)
-
-	return &mcp.CallToolResultFor[any]{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: strings.Join(tabStrings, "\n")},
-		},
-	}, nil
-}
-
-// docsCreateHandler is the handler for the docs create tool.
-func docsCreateHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[DocsCreateArgs]) (*mcp.CallToolResultFor[any], error) {
-	if params.Arguments.Title == "" {
-		return nil, fmt.Errorf("title is a required argument")
-	}
-	if params.Arguments.MarkdownFile == "" && params.Arguments.MarkdownText == "" {
-		return nil, fmt.Errorf("either markdown_file or markdown_text is required")
-	}
-	if params.Arguments.MarkdownFile != "" && params.Arguments.MarkdownText != "" {
-		return nil, fmt.Errorf("only one of markdown_file or markdown_text can be provided")
-	}
-
-	var markdownContent string
-	if params.Arguments.MarkdownFile != "" {
-		content, err := os.ReadFile(params.Arguments.MarkdownFile)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read markdown file: %w", err)
-		}
-		markdownContent = string(content)
-	} else {
-		markdownContent = params.Arguments.MarkdownText
-	}
-
-	docsSvc, err := getDocsSvc(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	doc, err := drive.CreateDocFromMarkdown(docsSvc, params.Arguments.Title, markdownContent)
-	if err != nil {
-		return nil, err
-	}
-
-	return &mcp.CallToolResultFor[any]{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: fmt.Sprintf("Successfully created document %s (%s)", doc.Title, doc.DocumentId)},
-		},
-	}, nil
-}
-
-// sheetsListHandler is the handler for the sheets list tool.
-func sheetsListHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[ListSheetsArgs]) (*mcp.CallToolResultFor[any], error) {
-	if params.Arguments.SpreadsheetID == "" {
-		return nil, fmt.Errorf("spreadsheet-id is a required argument")
-	}
-	sheetsSvc, err := getSheetsSvc(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	sheets, err := drive.ListSheets(sheetsSvc, params.Arguments.SpreadsheetID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to list sheets: %w", err)
-	}
-
-	return &mcp.CallToolResultFor[any]{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: strings.Join(sheets, "\n")},
-		},
-	}, nil
-}
-
-// sheetsGetHandler is the handler for the sheets get tool.
-func sheetsGetHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[GetSheetArgs]) (*mcp.CallToolResultFor[any], error) {
-	if params.Arguments.SpreadsheetID == "" {
-		return nil, fmt.Errorf("spreadsheet-id is a required argument")
-	}
-	if params.Arguments.SheetName == "" {
-		return nil, fmt.Errorf("sheet-name is a required argument")
-	}
-	sheetsSvc, err := getSheetsSvc(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	csv, err := drive.GetSheetAsCSV(sheetsSvc, params.Arguments.SpreadsheetID, params.Arguments.SheetName)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get sheet as csv: %w", err)
-	}
-
-	return &mcp.CallToolResultFor[any]{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: csv},
-		},
-	}, nil
-}
-
-// sheetsGetRangeHandler is the handler for the sheets get-range tool.
-func sheetsGetRangeHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[GetSheetRangeArgs]) (*mcp.CallToolResultFor[any], error) {
-	if params.Arguments.SpreadsheetID == "" {
-		return nil, fmt.Errorf("spreadsheet-id is a required argument")
-	}
-	if params.Arguments.SheetName == "" {
-		return nil, fmt.Errorf("sheet-name is a required argument")
-	}
-	if params.Arguments.Range == "" {
-		return nil, fmt.Errorf("range is a required argument")
-	}
-	sheetsSvc, err := getSheetsSvc(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	values, err := drive.GetSheetRange(sheetsSvc, params.Arguments.SpreadsheetID, params.Arguments.SheetName, params.Arguments.Range)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get sheet range: %w", err)
-	}
-
-	jsonValues, err := json.Marshal(values)
-	if err != nil {
-		return nil, fmt.Errorf("unable to marshal values to json: %w", err)
-	}
-
-	return &mcp.CallToolResultFor[any]{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: string(jsonValues)},
-		},
-	}, nil
-}
-
-// sheetsUpdateRangeHandler is the handler for the sheets update-range tool.
-func sheetsUpdateRangeHandler(ctx context.Context, ss *mcp.ServerSession, params *mcp.CallToolParamsFor[UpdateSheetRangeArgs]) (*mcp.CallToolResultFor[any], error) {
-	if params.Arguments.SpreadsheetID == "" {
-		return nil, fmt.Errorf("spreadsheet-id is a required argument")
-	}
-	if params.Arguments.SheetName == "" {
-		return nil, fmt.Errorf("sheet-name is a required argument")
-	}
-	if params.Arguments.Range == "" {
-		return nil, fmt.Errorf("range is a required argument")
-	}
-	if params.Arguments.Value == "" {
-		return nil, fmt.Errorf("value is a required argument")
-	}
-	sheetsSvc, err := getSheetsSvc(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	values := [][]interface{}{{params.Arguments.Value}}
-	err = drive.UpdateSheetRange(sheetsSvc, params.Arguments.SpreadsheetID, params.Arguments.SheetName, params.Arguments.Range, values)
-	if err != nil {
-		return nil, fmt.Errorf("unable to update sheet range: %w", err)
-	}
-
-	return &mcp.CallToolResultFor[any]{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: "Sheet updated successfully."},
-		},
-	}, nil
 }
