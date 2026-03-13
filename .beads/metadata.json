@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "drivectl",
+  "project_id": "98b75a22-24df-4236-9acd-bd4d939b2fa5"
+}

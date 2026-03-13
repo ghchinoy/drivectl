@@ -35,3 +35,11 @@ drivectl
 .gemini/
 
 recaps/
+.DS_Store
+
+sources/
+plans/
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db
