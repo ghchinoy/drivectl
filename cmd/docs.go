@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -43,6 +44,15 @@ var docsTabsCmd = &cobra.Command{
 		tabs, err := drive.GetTabs(docsSvc, documentId)
 		if err != nil {
 			return ui.ErrorWithHint(err, "Ensure the document ID is correct and is a Google Doc.")
+		}
+
+		if OutputFormat == "json" {
+			b, err := json.MarshalIndent(tabs, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(b))
+			return nil
 		}
 
 		fmt.Println(ui.Accent("Tabs:"))
@@ -82,6 +92,15 @@ var docsCreateCmd = &cobra.Command{
 		doc, err := drive.CreateDocFromMarkdown(docsSvc, title, string(content))
 		if err != nil {
 			return ui.ErrorWithHint(err, "An error occurred communicating with Google Docs.")
+		}
+
+		if OutputFormat == "json" {
+			b, err := json.MarshalIndent(doc, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(b))
+			return nil
 		}
 
 		ui.PrintSuccess("Created document %s %s", doc.Title, ui.ID("("+doc.DocumentId+")"))

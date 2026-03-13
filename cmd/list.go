@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/ghchinoy/drivectl/internal/drive"
@@ -41,6 +42,16 @@ For more information on query syntax, see: https://developers.google.com/drive/a
 		files, err := drive.ListFiles(driveSvc, limit, query)
 		if err != nil {
 			return ui.ErrorWithHint(fmt.Errorf("unable to retrieve files: %w", err), "Check your query syntax and ensure you have network access.")
+		}
+
+		if OutputFormat == "json" {
+			// json import added at top
+			b, err := json.MarshalIndent(files, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(b))
+			return nil
 		}
 
 		fmt.Println(ui.Accent("Files:"))

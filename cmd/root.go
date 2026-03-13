@@ -19,6 +19,8 @@ import (
 var (
 	// Version is the current version of the application, injected at build time.
 	Version = "dev"
+	// OutputFormat specifies the format of the output (e.g., json).
+	OutputFormat string
 	// noBrowserAuth is a flag to disable opening the browser for authentication.
 	noBrowserAuth bool
 	// client is the HTTP client used for all API calls.
@@ -100,6 +102,7 @@ func init() {
 
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().String("secret-file", "", "path to your client secrets file")
+	rootCmd.PersistentFlags().StringVarP(&OutputFormat, "output-format", "O", "", "output format (e.g. json)")
 	rootCmd.PersistentFlags().BoolVar(&noBrowserAuth, "no-browser-auth", false, "do not open a browser for authentication")
 	rootCmd.PersistentFlags().Bool("mcp", false, "enable MCP server mode over stdio")
 	rootCmd.PersistentFlags().String("mcp-http", "", "enable MCP server mode over HTTP at the given address")

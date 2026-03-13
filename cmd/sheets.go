@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -36,6 +37,16 @@ var sheetsListCmd = &cobra.Command{
 		if err != nil {
 			return ui.ErrorWithHint(err, "Ensure the spreadsheet ID is correct.")
 		}
+
+		if OutputFormat == "json" {
+			b, err := json.MarshalIndent(sheets, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(b))
+			return nil
+		}
+
 		fmt.Println(ui.Accent("Sheets:"))
 		for _, sheet := range sheets {
 			fmt.Println(sheet)
@@ -55,6 +66,20 @@ var sheetsGetCmd = &cobra.Command{
 		csv, err := drive.GetSheetAsCSV(sheetsSvc, spreadsheetId, sheetName)
 		if err != nil {
 			return ui.ErrorWithHint(err, "Check if the sheet name exists in the given spreadsheet ID.")
+		}
+
+		if OutputFormat == "json" {
+			res := map[string]interface{}{
+				"spreadsheetId": spreadsheetId,
+				"sheetName": sheetName,
+				"csv": csv,
+			}
+			b, err := json.MarshalIndent(res, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(b))
+			return nil
 		}
 
 		if sheetsOutputFile != "" {
@@ -81,6 +106,15 @@ var sheetsGetRangeCmd = &cobra.Command{
 		values, err := drive.GetSheetRange(sheetsSvc, spreadsheetId, sheetName, sheetRange)
 		if err != nil {
 			return ui.ErrorWithHint(err, "Verify the A1 notation of the range (e.g. A1:B2).")
+		}
+
+		if OutputFormat == "json" {
+			b, err := json.MarshalIndent(values, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(b))
+			return nil
 		}
 
 		w := new(tabwriter.Writer)
@@ -113,6 +147,23 @@ var sheetsUpdateRangeCmd = &cobra.Command{
 		if err != nil {
 			return ui.ErrorWithHint(err, "Verify the A1 notation of the range and that you have write permissions.")
 		}
+
+		if OutputFormat == "json" {
+			res := map[string]interface{}{
+				"status": "success",
+				"spreadsheetId": spreadsheetId,
+				"sheetName": sheetName,
+				"range": sheetRange,
+				"updatedValue": value,
+			}
+			b, err := json.MarshalIndent(res, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(b))
+			return nil
+		}
+
 		ui.PrintSuccess("Sheet updated successfully.")
 		return nil
 	},

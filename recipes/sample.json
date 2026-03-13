@@ -1,0 +1,7 @@
+{
+  "name": "Quick Diagnostics",
+  "description": "Lists recent documents.",
+  "steps": [
+    ["list", "--limit", "2"]
+  ]
+}

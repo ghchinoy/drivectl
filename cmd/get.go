@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -47,6 +48,22 @@ It can also extract the plain text content of a single tab from a Google Doc usi
 		content, err := drive.GetFile(driveSvc, docsSvc, fileId, format, tabId)
 		if err != nil {
 			return err
+		}
+
+		if OutputFormat == "json" {
+			// json import added at top
+			res := map[string]interface{}{
+				"fileId": fileId,
+				"content": string(content),
+				"format": format,
+				"tabId": tabId,
+			}
+			b, err := json.MarshalIndent(res, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(b))
+			return nil
 		}
 
 		if outputFile != "" {

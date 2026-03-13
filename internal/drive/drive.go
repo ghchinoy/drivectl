@@ -36,7 +36,7 @@ var formatMap = map[string]string{
 	"odp":      "application/vnd.oasis.opendocument.presentation",
 }
 
-// renderBodyAsText converts a Google Docs Body object to a plain text string.
+// renderBodyAsText converts a Google Docs Body object to a Markdown string.
 func renderBodyAsText(body *docs.Body) string {
 	var text strings.Builder
 	if body == nil || body.Content == nil {
@@ -44,9 +44,49 @@ func renderBodyAsText(body *docs.Body) string {
 	}
 	for _, element := range body.Content {
 		if element.Paragraph != nil {
+			// Check if it's a heading
+			if element.Paragraph.ParagraphStyle != nil {
+				style := element.Paragraph.ParagraphStyle.NamedStyleType
+				if strings.HasPrefix(style, "HEADING_") {
+					level := strings.TrimPrefix(style, "HEADING_")
+					switch level {
+					case "1": text.WriteString("# ")
+					case "2": text.WriteString("## ")
+					case "3": text.WriteString("### ")
+					case "4": text.WriteString("#### ")
+					case "5": text.WriteString("##### ")
+					case "6": text.WriteString("###### ")
+					}
+				}
+			}
+
+			// Check if it's a list item
+			if element.Paragraph.Bullet != nil {
+				// Simple heuristic for unordered vs ordered isn't easily exposed without looking at the list properties,
+				// but we can default to unordered bullet points for now.
+				nesting := element.Paragraph.Bullet.NestingLevel
+				indent := strings.Repeat("  ", int(nesting))
+				text.WriteString(indent + "* ")
+			}
+
 			for _, pElem := range element.Paragraph.Elements {
 				if pElem.TextRun != nil {
-					text.WriteString(pElem.TextRun.Content)
+					content := pElem.TextRun.Content
+					
+					// Apply formatting if present
+					if pElem.TextRun.TextStyle != nil {
+						style := pElem.TextRun.TextStyle
+						if style.Bold {
+							content = "**" + strings.TrimSpace(content) + "** "
+						} else if style.Italic {
+							content = "*" + strings.TrimSpace(content) + "* "
+						}
+						
+						if style.Link != nil && style.Link.Url != "" {
+							content = fmt.Sprintf("[%s](%s) ", strings.TrimSpace(content), style.Link.Url)
+						}
+					}
+					text.WriteString(content)
 				}
 			}
 		}
