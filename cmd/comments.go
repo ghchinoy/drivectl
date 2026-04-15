@@ -17,6 +17,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/ghchinoy/drivectl/internal/drive"
 	"github.com/ghchinoy/drivectl/internal/ui"
@@ -34,7 +35,17 @@ var commentsCmd = &cobra.Command{
 		fileId := args[0]
 		comments, err := drive.ListComments(driveSvc, fileId)
 		if err != nil {
-			return ui.ErrorWithHint(fmt.Errorf("unable to retrieve comments: %w", err), "Check if the file ID is correct and you have permission to view comments.")
+			hint := "Check if the file ID is correct and you have permission to view comments."
+			if strings.Contains(err.Error(), "500") || strings.Contains(err.Error(), "403") {
+				if file, describeErr := drive.DescribeFile(driveSvc, fileId); describeErr == nil {
+					if file.CopyRequiresWriterPermission {
+						hint = "This document has download/copy restrictions enabled, which can cause the Google API to reject comments requests."
+					} else {
+						hint = "The Google API returned an error. This can sometimes happen if the document has DLP policies or other strict restrictions."
+					}
+				}
+			}
+			return ui.ErrorWithHint(fmt.Errorf("unable to retrieve comments: %w", err), hint)
 		}
 
 		if OutputFormat == "json" {
