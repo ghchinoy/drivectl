@@ -97,6 +97,16 @@ You can dynamically execute *any* Google API endpoint using the `call` subcomman
 ./drivectl get <google-doc-id> --format md -o my-document.md
 ```
 
+**View file history and collaboration**
+
+```bash
+# View the revision history of a file
+./drivectl revisions <file-id>
+
+# View threaded comments on a file
+./drivectl comments <file-id>
+```
+
 ### Google Docs & Sheets
 
 **Create a Google Doc from Markdown**
