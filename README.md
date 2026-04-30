@@ -17,6 +17,16 @@ Please review either the [Gemini CLI Workspace Extension](https://github.com/gem
 
 ## Installation
 
+### Prebuilt Binaries
+
+You can quickly download and extract the latest prebuilt binary directly to your current directory:
+
+```bash
+curl -sL https://raw.githubusercontent.com/ghchinoy/drivectl/main/skills/google-drive-cli/scripts/install.sh | bash
+```
+
+### From Source
+
 1.  Ensure you have Go installed on your system.
 2.  Clone this repository.
 3.  Build the tool:
