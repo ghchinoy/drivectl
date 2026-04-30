@@ -49,3 +49,4 @@ drivectl call drive.v3.permissions.create --payload '{"fileId": "YOUR_FILE_ID", 
 If you do not know the exact method signature or required parameters, you can:
 1. Search the web or refer to standard Google API REST documentation (e.g., "Google Drive API REST reference"). The method signature maps directly to the REST resource structure (e.g., `drive.v3.files.update`).
 2. Make an educated guess using the pattern: `<api>.<version>.<resource>.<action>`.
+3. Consult the raw API Discovery documents. For example, the Drive v3 discovery document is located at: `https://www.googleapis.com/discovery/v1/apis/drive/v3/rest`
