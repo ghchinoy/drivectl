@@ -1,10 +1,10 @@
 ---
-name: drivectl-workspace
+name: google-drive-cli
 description: Interact with Google Drive, Docs, and Sheets using the drivectl CLI. Use this skill when asked to list Drive files, download files, read/update Sheets, or create/export Google Docs.
 metadata:
   discovery_doc_drive_v3: "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"
 ---
-# drivectl-workspace
+# google-drive-cli
 
 This skill provides guidance on using the `drivectl` command-line tool to interact with Google Workspace (Drive, Docs, Sheets).
 
