@@ -21,9 +21,16 @@ case "$ARCH_UNAME" in
 esac
 
 REPO="ghchinoy/drivectl"
+
+# Resolve latest release version tag
+LATEST_URL=$(curl -sLI -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest")
+TAG="${LATEST_URL##*/}"
+VERSION="${TAG#v}"
+
 FILENAME="drivectl_${OS}_${ARCH}.tar.gz"
-URL="https://github.com/${REPO}/releases/latest/download/${FILENAME}"
-CHECKSUMS_URL="https://github.com/${REPO}/releases/latest/download/checksums.txt"
+URL="https://github.com/${REPO}/releases/download/${TAG}/${FILENAME}"
+CHECKSUMS_FILENAME="drivectl_${VERSION}_checksums.txt"
+CHECKSUMS_URL="https://github.com/${REPO}/releases/download/${TAG}/${CHECKSUMS_FILENAME}"
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
