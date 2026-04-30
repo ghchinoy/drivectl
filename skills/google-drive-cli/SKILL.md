@@ -11,6 +11,7 @@ This skill provides guidance on using the `drivectl` command-line tool to intera
 ## Prerequisites & Authentication
 
 - Ensure `drivectl` is available in your PATH or in the current working directory (e.g., `./drivectl`).
+  *If it is not installed, you can quickly download the latest prebuilt binary by running the bundled script: `scripts/install.sh`.*
 - **Crucial Rule:** Always append `-O json` to `drivectl` commands when you need to parse the output programmatically or return structured information.
 
 ### First-time Authentication
