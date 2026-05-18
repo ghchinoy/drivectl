@@ -59,3 +59,10 @@ When a user reports a bug or asks you to verify a piece of functionality, follow
      test file"), you must first verify which specific file or entity the user means. If the reference is ambiguous or could match multiple
      items, use tools like `list_directory` to inspect the most likely locations. State your intended target back to the user for
      confirmation before proceeding with any action. This prevents errors caused by incorrect assumptions.
+
+## Architecture and Design
+
+**CLI Command Structure:** When adding features to `drivectl`, refer to `docs/DESIGN_PHILOSOPHY.md`. 
+*   **The `call` command** must remain uncomplicated and is strictly for standard REST/JSON interactions.
+*   **Native subcommands** (like `upload`) should be created for operations involving complex protocols, binary data streaming, or significant user-experience optimizations.
+
