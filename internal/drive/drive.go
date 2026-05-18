@@ -3,6 +3,8 @@ package drive
 import (
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"google.golang.org/api/docs/v1"
@@ -253,4 +255,29 @@ func CreateDocFromMarkdown(docsSvc *docs.Service, title string, markdownContent 
 	}
 
 	return createdDoc, nil
+}
+
+// UploadFile uploads a local file to Google Drive.
+func UploadFile(srv *drive.Service, filePath string, parentID string) (*drive.File, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("unable to open file %s: %w", filePath, err)
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	fileName := filepath.Base(filePath)
+	f := &drive.File{
+		Name: fileName,
+	}
+	if parentID != "" {
+		f.Parents = []string{parentID}
+	}
+
+	res, err := srv.Files.Create(f).Media(file).Do()
+	if err != nil {
+		return nil, fmt.Errorf("unable to create file %s: %w", fileName, err)
+	}
+	return res, nil
 }
