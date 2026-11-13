@@ -2,15 +2,27 @@
 
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
-## Quick Reference
+## Build, Test & Linting Gates
 
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work atomically
-bd close <id>         # Complete work
-bd sync               # Sync with git
-```
+When working with `drivectl`, run the following quality gates before committing:
+
+* **Build:** `go build ./...` (verify both `CGO_ENABLED=1` and `CGO_ENABLED=0`)
+* **Test:** `go test -race ./...`
+* **Dependencies:** `go mod tidy`
+* **Vulnerability Check:** `go run golang.org/x/vuln/cmd/govulncheck@latest ./...`
+* **Linting & Code Health:** `golangci-lint run -E gocyclo -E cyclop -E gocognit ./...` (configured via `.golangci.yml` v2)
+
+## Architecture & Design
+
+**CLI Command Structure:** When adding features to `drivectl`, refer to `docs/DESIGN_PHILOSOPHY.md`.
+* **The `call` command** must remain uncomplicated and is strictly for standard REST/JSON interactions.
+* **Native subcommands** (like `upload`) should be created for operations involving complex protocols, binary data streaming, or significant user-experience optimizations.
+
+## Discovery & MCP Schema Invariants (`internal/discovery` & `mcp`)
+
+* **Typed Parameter Defaults:** `mcp.AddTool` (`github.com/modelcontextprotocol/go-sdk/mcp`) resolves input schemas with `ValidateDefaults: true`. In `internal/discovery/schema.go`, always encode Discovery `MethodParameter.Default` strings as raw JSON booleans or numbers when `Type` is `boolean`, `integer`, or `number`.
+* **Discovery `"any"` Types & Recursive `$ref`s:** Normalize Discovery `"type": "any"` to `""` in `jsonschema.Schema`, and maintain a per-branch `visited` map when expanding `doc.Schemas` `$ref`s so recursive schemas (such as `docs.v1` `Tab.childTabs`) neither stack-overflow nor share pointer nodes across the schema tree.
+* **In-Memory Test Doubles:** Use `http.RoundTripper` fakes and `mcp.NewInMemoryTransports()` in `*_test.go` rather than `httptest.NewServer` so `go test -race ./...` runs deterministically inside restricted sandboxes.
 
 ## Non-Interactive Shell Commands
 

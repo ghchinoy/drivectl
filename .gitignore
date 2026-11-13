@@ -44,4 +44,7 @@ plans/
 .dolt/
 dolt/
 dolt-server.*
+dolt-server*
+.beads/proxieddb/
+*.gate.lock*
 *.db
