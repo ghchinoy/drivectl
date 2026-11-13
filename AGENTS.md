@@ -25,6 +25,12 @@ When working with `drivectl`, run the following quality gates before committing:
 * **Discovery `"any"` Types & Recursive `$ref`s:** Normalize Discovery `"type": "any"` to `""` in `jsonschema.Schema`, and maintain a per-branch `visited` map when expanding `doc.Schemas` `$ref`s so recursive schemas (such as `docs.v1` `Tab.childTabs`) neither stack-overflow nor share pointer nodes across the schema tree.
 * **In-Memory Test Doubles:** Use `http.RoundTripper` fakes and `mcp.NewInMemoryTransports()` in `*_test.go` rather than `httptest.NewServer` so `go test -race ./...` runs deterministically inside restricted sandboxes.
 
+## Documentation Site & Release Invariants (`site/` & `.goreleaser.yaml`)
+
+* **GitHub Pages Base Path (`base: '/drivectl'`):** The documentation site is served from GitHub Project Pages at `https://ghchinoy.github.io/drivectl/`. Keep `base: '/drivectl'` in `site/astro.config.mjs`, prefix internal Markdown links in `docs/site/` with `/drivectl/...`, and prefix custom Astro component asset paths with `import.meta.env.BASE_URL`. Run `npm run check:docs` in `site/` to verify no unprefixed `/_astro/` or root-relative links slip in.
+* **Starlight Content Directory (`docs/site/`):** Public documentation pages live in `docs/site/` (loaded via `docsLoader({ base: '../docs/site' })`), keeping repository-internal design docs in `docs/` out of the published site tree.
+* **GoReleaser v2 Config (`.goreleaser.yaml`):** `.github/workflows/release.yaml` runs `goreleaser/goreleaser-action@v6` (`version: latest`) on `v*` tags; use plural `formats: [tar.gz]` / `format_overrides.formats: [zip]` in `.goreleaser.yaml`.
+
 ## Non-Interactive Shell Commands
 
 **ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
