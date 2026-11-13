@@ -12,7 +12,7 @@ A central design principle in `drivectl` (documented in [Design Philosophy](../.
 The [`drivectl call`](/drivectl/commands/discovery) command is a lightweight bridge to the Google API Discovery Service. You provide a dot-separated method identifier (`<service>.<version>.<resource>.<method>`) and a JSON `--payload`:
 
 - **Uncomplicated REST/JSON:** Ideal for any Google Workspace endpoint whose request and response are pure JSON (`drive.v3.permissions.create`, `docs.v1.documents.create`, `drive.v3.files.update`).
-- **Automatic parameter routing:** `internal/discovery` inspects the Discovery Document at runtime and routes payload fields to URL path templates, query parameters, or the HTTP request body.
+- **Automatic parameter routing:** `pkg/discovery` inspects the Discovery Document at runtime and routes payload fields to URL path templates, query parameters, or the HTTP request body.
 
 :::caution[Permission Grants via Discovery vs. `share-with`]
 Because `drivectl call` is a raw passthrough to Google Discovery, calling `drive.v3.permissions.create` without `"sendNotificationEmail": false` and `"supportsAllDrives": true` triggers Google Drive's default email notifications and fails on Shared Drives. For dedicated ACL management, use [`share-with`](https://github.com/ghchinoy/share-with) ([documentation](https://ghchinoy.github.io/share-with/)), which enforces `sendNotificationEmail=false` at the HTTP transport layer, parses `?resourcekey=...` URLs, and prevents accidental collaborator role downgrades.
@@ -20,11 +20,19 @@ Because `drivectl call` is a raw passthrough to Google Discovery, calling `drive
 
 ### When native subcommands are used
 
-Whenever an operation involves binary streaming, multi-step protocols, or AST transformation, `drivectl` provides a dedicated subcommand under `cmd/` and `internal/drive/`:
+Whenever an operation involves binary streaming, multi-step protocols, or AST transformation, `drivectl` provides a dedicated subcommand under `cmd/` and `pkg/drive/`:
 
 - **Media streaming & uploads:** [`drivectl upload`](/drivectl/commands/drive) handles multipart media streams, parent folder placement, and custom MIME types cleanly.
-- **Document AST conversion:** [`drivectl docs create`](/drivectl/commands/docs) parses local Markdown with Goldmark into Google Docs `BatchUpdate` requests, while `drivectl get --format md` walks the Google Docs structural AST (`Paragraph`, `Table`, `List`, `TextRun`) to reconstruct clean Markdown.
-- **Spreadsheet range ergonomics:** [`drivectl sheets`](/drivectl/commands/sheets) wraps A1 range notation and CSV export without requiring verbose nested JSON payloads.
+- **Document & Slides AST conversion:** [`drivectl docs create`](/drivectl/commands/docs) parses local Markdown with Goldmark into Google Docs `BatchUpdate` requests, `drivectl get --format md` walks the Google Docs structural AST (`Paragraph`, `Table`, `List`, `TextRun`) to reconstruct clean Markdown, and `pkg/drive` provides `FetchPresentationAsMarkdown` / `RenderPresentationAsMarkdown` for Google Slides decks.
+- **Spreadsheet range ergonomics:** [`drivectl sheets`](/drivectl/commands/sheets) wraps A1 range notation and RFC 4180 CSV export without requiring verbose nested JSON payloads.
+
+## Using `drivectl` as a Go library
+
+External Go services (such as Cloud Run / Corp Run backends) can import `github.com/ghchinoy/drivectl` directly without touching local disk configuration:
+
+- **`github.com/ghchinoy/drivectl/pkg/drive`:** Stateless `NewClientFromBearerToken`, `NewClientFromTokenSource`, and `NewServicesFromClient` constructors plus `FetchFile`, `FetchTabs`, `CreateDocFromMarkdown`, `FetchSheetAsCSV`, and `FetchPresentationAsMarkdown`.
+- **`github.com/ghchinoy/drivectl/pkg/discovery`:** `FetchDiscoveryDocument`, `CallMethod`, `BuildRequest`, and `MethodToSchema`.
+- **`github.com/ghchinoy/drivectl/mcp`:** `RegisterTools(ctx, server, clientProvider, opts...)` mounts `drivectl`'s resources and Discovery tools onto any in-process `*mcp.Server`.
 
 ## Agent-aware CLI design
 

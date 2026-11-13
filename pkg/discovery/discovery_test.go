@@ -134,6 +134,33 @@ func TestBuildRequest(t *testing.T) {
 			wantBody:         `{"name":"updated.txt"}`,
 		},
 		{
+			name:   "patch_with_query_params_and_flat_payload",
+			method: mustFindMethod(t, doc, []string{"files"}, "update"),
+			parsed: map[string]any{
+				"fileId":            "f-99",
+				"supportsAllDrives": true,
+				"fields":            "id,name",
+				"name":              "renamed.txt",
+			},
+			unwrapPayloadKey: false,
+			wantMethod:       http.MethodPatch,
+			wantURL:          "https://www.googleapis.com/drive/v3/files/f-99?fields=id%2Cname&supportsAllDrives=true",
+			wantBody:         `{"name":"renamed.txt"}`,
+		},
+		{
+			name:   "patch_with_query_params_and_mcp_unwrapped_payload",
+			method: mustFindMethod(t, doc, []string{"files"}, "update"),
+			parsed: map[string]any{
+				"fileId":            "f-99",
+				"supportsAllDrives": true,
+				"payload":           map[string]any{"name": "mcp-renamed.txt"},
+			},
+			unwrapPayloadKey: true,
+			wantMethod:       http.MethodPatch,
+			wantURL:          "https://www.googleapis.com/drive/v3/files/f-99?supportsAllDrives=true",
+			wantBody:         `{"name":"mcp-renamed.txt"}`,
+		},
+		{
 			name:       "missing_required_path_parameter",
 			method:     mustFindMethod(t, doc, []string{"files"}, "update"),
 			parsed:     map[string]any{"name": "updated.txt"},
@@ -167,6 +194,74 @@ func TestBuildRequest(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCallMethod(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	ctx := t.Context()
+
+	client := &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			switch {
+			case strings.Contains(req.URL.Path, "/discovery/v1/apis/drive/v3/rest"):
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"name":"drive",
+						"version":"v3",
+						"baseUrl":"https://www.googleapis.com/drive/v3/",
+						"parameters":{"fields":{"type":"string","location":"query"}},
+						"schemas":{"File":{"id":"File","type":"object","properties":{"name":{"type":"string"}}}},
+						"resources":{"files":{"methods":{"update":{
+							"id":"drive.files.update",
+							"httpMethod":"PATCH",
+							"path":"files/{fileId}",
+							"parameters":{
+								"fileId":{"type":"string","location":"path","required":true},
+								"supportsAllDrives":{"type":"boolean","location":"query"}
+							},
+							"request":{"$ref":"File"}
+						}}}}
+					}`)),
+					Header:  make(http.Header),
+					Request: req,
+				}, nil
+			case req.Method == http.MethodPatch && req.URL.Path == "/drive/v3/files/f-1":
+				if req.URL.Query().Get("supportsAllDrives") != "true" {
+					t.Errorf("CallMethod query supportsAllDrives = %q, want \"true\"", req.URL.Query().Get("supportsAllDrives"))
+				}
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"f-1","name":"Updated"}`)),
+					Header:     make(http.Header),
+					Request:    req,
+				}, nil
+			default:
+				return &http.Response{
+					StatusCode: http.StatusBadRequest,
+					Body:       io.NopCloser(strings.NewReader(`{"error":"bad request"}`)),
+					Header:     make(http.Header),
+					Request:    req,
+				}, nil
+			}
+		}),
+	}
+
+	respBytes, err := CallMethod(ctx, client, "drive.v3.files.update", map[string]any{
+		"fileId":            "f-1",
+		"supportsAllDrives": true,
+		"name":              "Updated",
+	})
+	if err != nil {
+		t.Fatalf("CallMethod(ctx, client, \"drive.v3.files.update\", ...) error = %v", err)
+	}
+	if string(respBytes) != `{"id":"f-1","name":"Updated"}` {
+		t.Errorf("CallMethod(ctx, client, \"drive.v3.files.update\", ...) = %q, want `{\"id\":\"f-1\",\"name\":\"Updated\"}`", string(respBytes))
+	}
+
+	if _, err := CallMethod(ctx, client, "invalid.endpoint", nil); err == nil {
+		t.Errorf("CallMethod(ctx, client, \"invalid.endpoint\", nil) = nil, want error")
 	}
 }
 
@@ -259,6 +354,12 @@ func sampleDiscoveryDoc() *RestDescription {
 		Name:    "drive",
 		Version: "v3",
 		BaseURL: "https://www.googleapis.com/drive/v3/",
+		Parameters: map[string]MethodParameter{
+			"fields": {
+				Type:     "string",
+				Location: "query",
+			},
+		},
 		Schemas: map[string]JSONSchema{
 			"File": {
 				ID:   "File",
@@ -315,6 +416,11 @@ func sampleDiscoveryDoc() *RestDescription {
 								Type:     "string",
 								Location: "path",
 								Required: true,
+							},
+							"supportsAllDrives": {
+								Type:     "boolean",
+								Location: "query",
+								Default:  "false",
 							},
 						},
 						Request: &SchemaRef{Ref: "File"},

@@ -156,6 +156,62 @@ func FetchDiscoveryDocument(ctx context.Context, client *http.Client, service, v
 	return &doc, nil
 }
 
+// CallMethod resolves a dot-separated endpoint (such as "drive.v3.files.get")
+// against its Discovery Document, executes the HTTP request, and returns the raw response body.
+func CallMethod(ctx context.Context, client *http.Client, endpoint string, payload map[string]any) ([]byte, error) {
+	parts := strings.Split(endpoint, ".")
+	if len(parts) < 4 {
+		return nil, errors.New("invalid endpoint format: expected 'service.version.resource.method'")
+	}
+
+	serviceName := parts[0]
+	version := parts[1]
+	methodName := parts[len(parts)-1]
+	resourcePath := parts[2 : len(parts)-1]
+
+	doc, err := FetchDiscoveryDocument(ctx, client, serviceName, version)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch discovery document: %w", err)
+	}
+
+	return doc.CallMethod(ctx, client, resourcePath, methodName, payload, false)
+}
+
+// CallMethod resolves a nested resource path and method name inside doc,
+// builds and executes the HTTP request, and returns the raw response body.
+func (doc *RestDescription) CallMethod(ctx context.Context, client *http.Client, resourcePath []string, methodName string, payload map[string]any, unwrapPayloadKey bool) ([]byte, error) {
+	method, err := FindMethod(doc, resourcePath, methodName)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := BuildRequest(ctx, doc, method, payload, unwrapPayloadKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if client == nil {
+		client = http.DefaultClient
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("executing API request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode >= http.StatusBadRequest {
+		return nil, fmt.Errorf("unexpected HTTP %d from API: %s", resp.StatusCode, string(respBody))
+	}
+
+	return respBody, nil
+}
+
 // FindMethod resolves a nested resource path and method name inside a Discovery Document.
 func FindMethod(doc *RestDescription, resourcePath []string, methodName string) (*RestMethod, error) {
 	if doc == nil {
@@ -198,6 +254,11 @@ func BuildRequest(ctx context.Context, doc *RestDescription, method *RestMethod,
 		return nil, err
 	}
 
+	apiURL, err = extractQueryParams(apiURL, doc, method, params)
+	if err != nil {
+		return nil, err
+	}
+
 	reqBody, apiURL, err := prepareQueryOrBody(apiURL, method, params, unwrapPayloadKey)
 	if err != nil {
 		return nil, err
@@ -214,10 +275,13 @@ func BuildRequest(ctx context.Context, doc *RestDescription, method *RestMethod,
 }
 
 func resolveMethodURL(doc *RestDescription, method *RestMethod) string {
-	if doc.BaseURL != "" {
+	if doc != nil && doc.BaseURL != "" {
 		return doc.BaseURL + method.Path
 	}
-	return doc.RootURL + doc.ServicePath + method.Path
+	if doc != nil {
+		return doc.RootURL + doc.ServicePath + method.Path
+	}
+	return method.Path
 }
 
 func cloneMap(src map[string]any) map[string]any {
@@ -247,6 +311,44 @@ func substitutePathParams(apiURL string, method *RestMethod, params map[string]a
 		}
 	}
 	return apiURL, nil
+}
+
+func extractQueryParams(apiURL string, doc *RestDescription, method *RestMethod, params map[string]any) (string, error) {
+	if len(params) == 0 {
+		return apiURL, nil
+	}
+	u, err := url.Parse(apiURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid API URL %q: %w", apiURL, err)
+	}
+	q := u.Query()
+	modified := false
+	for k, v := range params {
+		if isQueryParameter(doc, method, k) {
+			q.Set(k, fmt.Sprint(v))
+			delete(params, k)
+			modified = true
+		}
+	}
+	if !modified {
+		return apiURL, nil
+	}
+	u.RawQuery = q.Encode()
+	return u.String(), nil
+}
+
+func isQueryParameter(doc *RestDescription, method *RestMethod, name string) bool {
+	if method != nil {
+		if paramDef, ok := method.Parameters[name]; ok && paramDef.Location == "query" {
+			return true
+		}
+	}
+	if doc != nil {
+		if paramDef, ok := doc.Parameters[name]; ok && paramDef.Location == "query" {
+			return true
+		}
+	}
+	return false
 }
 
 func prepareQueryOrBody(apiURL string, method *RestMethod, params map[string]any, unwrapPayloadKey bool) (io.Reader, string, error) {

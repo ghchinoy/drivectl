@@ -15,6 +15,7 @@
 package drive
 
 import (
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"strings"
@@ -39,7 +40,7 @@ func ListSheets(sheetsSvc *sheets.Service, spreadsheetID string) ([]string, erro
 	return sheetNames, nil
 }
 
-// FetchSheetAsCSV retrieves a sheet and formats its cells as CSV.
+// FetchSheetAsCSV retrieves a sheet and formats its cells as RFC 4180 CSV.
 func FetchSheetAsCSV(sheetsSvc *sheets.Service, spreadsheetID, sheetName string) (string, error) {
 	resp, err := sheetsSvc.Spreadsheets.Values.Get(spreadsheetID, sheetName).Do()
 	if err != nil {
@@ -51,13 +52,19 @@ func FetchSheetAsCSV(sheetsSvc *sheets.Service, spreadsheetID, sheetName string)
 	}
 
 	var csvBuilder strings.Builder
+	writer := csv.NewWriter(&csvBuilder)
 	for _, row := range resp.Values {
-		var csvRow []string
+		csvRow := make([]string, 0, len(row))
 		for _, cell := range row {
 			csvRow = append(csvRow, fmt.Sprint(cell))
 		}
-		csvBuilder.WriteString(strings.Join(csvRow, ","))
-		csvBuilder.WriteString("\n")
+		if err := writer.Write(csvRow); err != nil {
+			return "", fmt.Errorf("unable to format CSV row: %w", err)
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return "", fmt.Errorf("unable to flush CSV writer: %w", err)
 	}
 
 	return csvBuilder.String(), nil

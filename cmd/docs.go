@@ -20,8 +20,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ghchinoy/drivectl/internal/drive"
 	"github.com/ghchinoy/drivectl/internal/ui"
+	"github.com/ghchinoy/drivectl/pkg/drive"
 	"github.com/spf13/cobra"
 )
 

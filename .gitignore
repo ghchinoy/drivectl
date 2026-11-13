@@ -38,7 +38,7 @@ recaps/
 .DS_Store
 
 sources/
-plans/
+/plans/
 
 # Dolt database files (added by bd init)
 .dolt/

@@ -21,13 +21,12 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/ghchinoy/drivectl/internal/drive"
 	"github.com/ghchinoy/drivectl/internal/ui"
+	"github.com/ghchinoy/drivectl/pkg/drive"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"google.golang.org/api/docs/v1"
 	googledrive "google.golang.org/api/drive/v3"
-	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
 )
 
@@ -78,20 +77,13 @@ Google Docs, including exporting to multiple formats and accessing individual ta
 			}
 		}
 
-		driveSvc, err = googledrive.NewService(ctx, option.WithHTTPClient(client))
+		svcs, err := drive.NewServicesFromClient(ctx, client)
 		if err != nil {
-			return fmt.Errorf("could not create drive service: %w", err)
+			return err
 		}
-
-		docsSvc, err = docs.NewService(ctx, option.WithHTTPClient(client))
-		if err != nil {
-			return fmt.Errorf("could not create docs service: %w", err)
-		}
-
-		sheetsSvc, err = sheets.NewService(ctx, option.WithHTTPClient(client))
-		if err != nil {
-			return fmt.Errorf("could not create sheets service: %w", err)
-		}
+		driveSvc = svcs.Drive
+		docsSvc = svcs.Docs
+		sheetsSvc = svcs.Sheets
 		return nil
 	},
 }

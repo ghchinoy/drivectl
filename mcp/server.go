@@ -28,13 +28,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ghchinoy/drivectl/internal/discovery"
-	"github.com/ghchinoy/drivectl/internal/drive"
+	"github.com/ghchinoy/drivectl/pkg/discovery"
+	"github.com/ghchinoy/drivectl/pkg/drive"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	googledrive "google.golang.org/api/drive/v3"
-	"google.golang.org/api/option"
 )
 
 const driveQueryCheatSheet = `
@@ -66,6 +64,24 @@ var dynamicTools = []string{
 	"sheets.v4.spreadsheets.get",
 	"sheets.v4.spreadsheets.values.get",
 	"sheets.v4.spreadsheets.values.update",
+	"slides.v1.presentations.get",
+}
+
+// ClientProvider returns an authenticated *http.Client for executing Google Workspace API requests.
+type ClientProvider func(ctx context.Context) (*http.Client, error)
+
+type registerConfig struct {
+	discoveryClient *http.Client
+}
+
+// RegisterOption configures optional settings for RegisterTools.
+type RegisterOption func(*registerConfig)
+
+// WithDiscoveryHTTPClient overrides the HTTP client used to fetch Google Discovery Documents.
+func WithDiscoveryHTTPClient(client *http.Client) RegisterOption {
+	return func(cfg *registerConfig) {
+		cfg.discoveryClient = client
+	}
 }
 
 var (
@@ -162,6 +178,29 @@ func a1NotationCheatSheetHandler(_ context.Context, req *mcp.ReadResourceRequest
 }
 
 func registerToolsAndResources(ctx context.Context, server *mcp.Server) error {
+	return RegisterTools(ctx, server, apiClientFactory, WithDiscoveryHTTPClient(discoveryHTTPClient))
+}
+
+// RegisterTools mounts drivectl's embedded resources and Discovery-backed Google Workspace
+// tools onto an existing *mcp.Server using the provided ClientProvider.
+// It does not mutate global state or open local log files.
+func RegisterTools(ctx context.Context, server *mcp.Server, clientProvider ClientProvider, opts ...RegisterOption) error {
+	if server == nil {
+		return errors.New("mcp server cannot be nil")
+	}
+	if clientProvider == nil {
+		clientProvider = newHTTPClient
+	}
+
+	cfg := &registerConfig{
+		discoveryClient: discoveryHTTPClient,
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(cfg)
+		}
+	}
+
 	server.AddResource(&mcp.Resource{
 		Name:        "drive-query-cheat-sheet",
 		Description: "A cheat sheet of example Google Drive query examples.",
@@ -179,54 +218,65 @@ func registerToolsAndResources(ctx context.Context, server *mcp.Server) error {
 	docsCache := make(map[string]*discovery.RestDescription)
 
 	for _, endpoint := range dynamicTools {
-		parts := strings.Split(endpoint, ".")
-		serviceName := parts[0]
-		version := parts[1]
-		cacheKey := serviceName + "_" + version
-
-		if _, ok := docsCache[cacheKey]; !ok {
-			doc, err := discovery.FetchDiscoveryDocument(ctx, discoveryHTTPClient, serviceName, version)
-			if err != nil {
-				log.Printf("Failed to fetch discovery doc for %s: %v", cacheKey, err)
-				continue
-			}
-			docsCache[cacheKey] = doc
-		}
-
-		doc := docsCache[cacheKey]
-		methodName := parts[len(parts)-1]
-		resourcePath := parts[2 : len(parts)-1]
-
-		method, err := discovery.FindMethod(doc, resourcePath, methodName)
-		if err != nil {
-			log.Printf("Failed to find method %s in %s: %v", endpoint, cacheKey, err)
-			continue
-		}
-
-		schema := discovery.MethodToSchema(method, doc)
-
-		localEndpoint := endpoint
-		localMethod := method
-		localDoc := doc
-
-		mcpTool := &mcp.Tool{
-			Name:        localEndpoint,
-			Description: localMethod.Description,
-			InputSchema: schema,
-		}
-
-		mcp.AddTool(server, mcpTool, func(ctx context.Context, _ *mcp.CallToolRequest, args map[string]any) (*mcp.CallToolResult, any, error) {
-			res, err := executeDynamicCall(ctx, localDoc, localMethod, args)
-			return res, nil, err
-		})
-		log.Printf("Registered MCP tool: %s", localEndpoint)
+		registerDynamicEndpoint(ctx, server, cfg.discoveryClient, clientProvider, docsCache, endpoint)
 	}
 
 	return nil
 }
 
-func executeDynamicCall(ctx context.Context, doc *discovery.RestDescription, method *discovery.RestMethod, parsed map[string]any) (*mcp.CallToolResult, error) {
-	client, err := apiClientFactory(ctx)
+func registerDynamicEndpoint(
+	ctx context.Context,
+	server *mcp.Server,
+	discClient *http.Client,
+	clientProvider ClientProvider,
+	docsCache map[string]*discovery.RestDescription,
+	endpoint string,
+) {
+	parts := strings.Split(endpoint, ".")
+	serviceName := parts[0]
+	version := parts[1]
+	cacheKey := serviceName + "_" + version
+
+	if _, ok := docsCache[cacheKey]; !ok {
+		doc, err := discovery.FetchDiscoveryDocument(ctx, discClient, serviceName, version)
+		if err != nil {
+			log.Printf("Failed to fetch discovery doc for %s: %v", cacheKey, err)
+			return
+		}
+		docsCache[cacheKey] = doc
+	}
+
+	doc := docsCache[cacheKey]
+	methodName := parts[len(parts)-1]
+	resourcePath := parts[2 : len(parts)-1]
+
+	method, err := discovery.FindMethod(doc, resourcePath, methodName)
+	if err != nil {
+		log.Printf("Failed to find method %s in %s: %v", endpoint, cacheKey, err)
+		return
+	}
+
+	schema := discovery.MethodToSchema(method, doc)
+	mcpTool := &mcp.Tool{
+		Name:        endpoint,
+		Description: method.Description,
+		InputSchema: schema,
+	}
+
+	mcp.AddTool(server, mcpTool, func(ctx context.Context, _ *mcp.CallToolRequest, args map[string]any) (*mcp.CallToolResult, any, error) {
+		res, err := executeDynamicCall(ctx, clientProvider, doc, method, args)
+		return res, nil, err
+	})
+}
+
+func executeDynamicCall(
+	ctx context.Context,
+	clientProvider ClientProvider,
+	doc *discovery.RestDescription,
+	method *discovery.RestMethod,
+	parsed map[string]any,
+) (*mcp.CallToolResult, error) {
+	client, err := clientProvider(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -235,12 +285,6 @@ func executeDynamicCall(ctx context.Context, doc *discovery.RestDescription, met
 	if err != nil {
 		return nil, err
 	}
-
-	driveSvc, err := googledrive.NewService(ctx, option.WithHTTPClient(client))
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate token client: %w", err)
-	}
-	_ = driveSvc
 
 	resp, err := client.Do(req)
 	if err != nil {

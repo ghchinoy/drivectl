@@ -32,9 +32,20 @@ When the server starts, it registers two tiers of tools:
    - `drivectl_read`: read or export a Google Drive file or Google Doc (`raw`, `txt`, `md`).
    - `drivectl_call`: invoke any Google API method dynamically by `serviceMethod` and JSON `payload`.
 2. **Dynamic Discovery tools:**
-   - `drive_v3_files_list` (`drive.v3.files.list`)
-   - `docs_v1_documents_get` (`docs.v1.documents.get`)
-   - `sheets_v4_spreadsheets_get` (`sheets.v4.spreadsheets.get`)
+   - `drive.v3.files.list`, `drive.v3.files.get`, `drive.v3.files.create`, `drive.v3.files.update`
+   - `docs.v1.documents.create`, `docs.v1.documents.get`, `docs.v1.documents.batchUpdate`
+   - `sheets.v4.spreadsheets.create`, `sheets.v4.spreadsheets.get`, `sheets.v4.spreadsheets.values.get`, `sheets.v4.spreadsheets.values.update`
+   - `slides.v1.presentations.get`
+
+## Embed in another Go MCP server
+
+Use `mcp.RegisterTools` to mount `drivectl`'s resources and Discovery tools onto an existing `*mcp.Server` with a custom `ClientProvider`:
+
+```go
+err := drivectlmcp.RegisterTools(ctx, server, func(ctx context.Context) (*http.Client, error) {
+    return drive.NewClientFromBearerToken(ctx, accessToken), nil
+})
+```
 
 ## Configure Gemini CLI
 

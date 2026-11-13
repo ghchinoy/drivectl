@@ -24,6 +24,7 @@ A Go command-line interface (CLI) and Model Context Protocol (MCP) server for in
   - [Dynamic Discovery Calls (`call`)](#dynamic-discovery-calls-call)
   - [Automating Workflows (`run`)](#automating-workflows-run)
 - [MCP Server Mode](#mcp-server-mode)
+- [Using as a Go Library (`pkg/drive`, `pkg/discovery`, `mcp`)](#using-as-a-go-library-pkgdrive-pkgdiscovery-mcp)
 - [Agent Skill & Gemini CLI Configuration](#agent-skill--gemini-cli-configuration)
 - [Local Development](#local-development)
 - [Releasing & Publishing](#releasing--publishing)
@@ -244,6 +245,50 @@ Chain multiple `drivectl` commands in a declarative JSON recipe ([`recipes/sampl
 
 # Start MCP server over HTTP (Streamable HTTP + SSE compatibility)
 ./drivectl --mcp-http :8080
+```
+
+## Using as a Go Library (`pkg/drive`, `pkg/discovery`, `mcp`)
+
+External Go services (such as Cloud Run backends or MCP hosts) can import `github.com/ghchinoy/drivectl` directly with stateless OAuth bearer tokens or `oauth2.TokenSource` instances—without local disk state or stdout output:
+
+```go
+import (
+	"context"
+	"net/http"
+
+	drivectlmcp "github.com/ghchinoy/drivectl/mcp"
+	"github.com/ghchinoy/drivectl/pkg/discovery"
+	"github.com/ghchinoy/drivectl/pkg/drive"
+)
+
+func example(ctx context.Context, accessToken string) error {
+	// 1. Construct a stateless HTTP client and Workspace services bundle
+	client := drive.NewClientFromBearerToken(ctx, accessToken)
+	svcs, err := drive.NewServicesFromClient(ctx, client)
+	if err != nil {
+		return err
+	}
+
+	// 2. Fetch Google Docs, Sheets (RFC 4180 CSV), or Slides (Markdown)
+	csvData, _ := drive.FetchSheetAsCSV(svcs.Sheets, "spreadsheet-id", "Sheet1")
+	slidesMD, _ := drive.FetchPresentationAsMarkdown(svcs.Slides, "presentation-id")
+	_, _ = csvData, slidesMD
+
+	// 3. Call any Discovery endpoint directly
+	_, err = discovery.CallMethod(ctx, client, "drive.v3.files.get", map[string]any{
+		"fileId": "file-id",
+		"fields": "id,name,mimeType",
+	})
+	return err
+}
+```
+
+To mount `drivectl`'s resources and Discovery tools onto an existing `*mcp.Server`:
+
+```go
+err := drivectlmcp.RegisterTools(ctx, server, func(ctx context.Context) (*http.Client, error) {
+	return drive.NewClientFromBearerToken(ctx, accessToken), nil
+})
 ```
 
 ## Agent Skill & Gemini CLI Configuration

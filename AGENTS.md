@@ -19,10 +19,11 @@ When working with `drivectl`, run the following quality gates before committing:
 * **The `call` command** must remain uncomplicated and is strictly for standard REST/JSON interactions.
 * **Native subcommands** (like `upload`) should be created for operations involving complex protocols, binary data streaming, or significant user-experience optimizations.
 
-## Discovery & MCP Schema Invariants (`internal/discovery` & `mcp`)
+## Discovery & MCP Schema Invariants (`pkg/discovery` & `mcp`)
 
-* **Typed Parameter Defaults:** `mcp.AddTool` (`github.com/modelcontextprotocol/go-sdk/mcp`) resolves input schemas with `ValidateDefaults: true`. In `internal/discovery/schema.go`, always encode Discovery `MethodParameter.Default` strings as raw JSON booleans or numbers when `Type` is `boolean`, `integer`, or `number`.
+* **Typed Parameter Defaults:** `mcp.AddTool` (`github.com/modelcontextprotocol/go-sdk/mcp`) resolves input schemas with `ValidateDefaults: true`. In `pkg/discovery/schema.go`, always encode Discovery `MethodParameter.Default` strings as raw JSON booleans or numbers when `Type` is `boolean`, `integer`, or `number`.
 * **Discovery `"any"` Types & Recursive `$ref`s:** Normalize Discovery `"type": "any"` to `""` in `jsonschema.Schema`, and maintain a per-branch `visited` map when expanding `doc.Schemas` `$ref`s so recursive schemas (such as `docs.v1` `Tab.childTabs`) neither stack-overflow nor share pointer nodes across the schema tree.
+* **Query Parameter Routing on Write Methods:** `pkg/discovery.BuildRequest` extracts `location == "query"` parameters (defined in either `method.Parameters` or `doc.Parameters`) onto the URL query string before serializing the JSON request body, even when `method.Request != nil`.
 * **In-Memory Test Doubles:** Use `http.RoundTripper` fakes and `mcp.NewInMemoryTransports()` in `*_test.go` rather than `httptest.NewServer` so `go test -race ./...` runs deterministically inside restricted sandboxes.
 
 ## Documentation Site & Release Invariants (`site/` & `.goreleaser.yaml`)

@@ -24,7 +24,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func TestMCPServer_ResourcesAndDynamicTools(t *testing.T) {
+func TestRegisterTools_EmbeddableAndDynamicTools(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	ctx := t.Context()
 
@@ -37,30 +37,31 @@ func TestMCPServer_ResourcesAndDynamicTools(t *testing.T) {
 				return newJSONResp(req, http.StatusOK, fakeDocsDiscoveryJSON), nil
 			case strings.Contains(req.URL.Path, "/discovery/v1/apis/sheets/v4/rest"):
 				return newJSONResp(req, http.StatusOK, fakeSheetsDiscoveryJSON), nil
+			case strings.Contains(req.URL.Path, "/discovery/v1/apis/slides/v1/rest"):
+				return newJSONResp(req, http.StatusOK, fakeSlidesDiscoveryJSON), nil
 			case req.Method == http.MethodGet && req.URL.Path == "/drive/v3/files":
 				return newJSONResp(req, http.StatusOK, `{"files":[{"id":"123","name":"Design.md"}]}`), nil
 			case req.Method == http.MethodPost && req.URL.Path == "/v1/documents":
 				return newJSONResp(req, http.StatusOK, `{"documentId":"doc-42","title":"Quarterly Plan"}`), nil
+			case req.Method == http.MethodGet && req.URL.Path == "/v1/presentations/pres-99":
+				return newJSONResp(req, http.StatusOK, `{"presentationId":"pres-99","title":"Deck"}`), nil
 			default:
 				return newJSONResp(req, http.StatusNotFound, `{"error":"not found"}`), nil
 			}
 		}),
 	}
 
-	origDiscoveryClient := discoveryHTTPClient
-	origAPIFactory := apiClientFactory
-	discoveryHTTPClient = fakeHTTP
-	apiClientFactory = func(context.Context) (*http.Client, error) {
-		return fakeHTTP, nil
-	}
-	t.Cleanup(func() {
-		discoveryHTTPClient = origDiscoveryClient
-		apiClientFactory = origAPIFactory
-	})
-
-	server := mcp.NewServer(&mcp.Implementation{Name: "drivectl"}, nil)
-	if err := registerToolsAndResources(ctx, server); err != nil {
-		t.Fatalf("registerToolsAndResources(ctx, server) error = %v", err)
+	server := mcp.NewServer(&mcp.Implementation{Name: "embedded-host"}, nil)
+	err := RegisterTools(
+		ctx,
+		server,
+		func(context.Context) (*http.Client, error) {
+			return fakeHTTP, nil
+		},
+		WithDiscoveryHTTPClient(fakeHTTP),
+	)
+	if err != nil {
+		t.Fatalf("RegisterTools(ctx, server, provider, WithDiscoveryHTTPClient) error = %v", err)
 	}
 
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
@@ -117,6 +118,19 @@ func TestMCPServer_ResourcesAndDynamicTools(t *testing.T) {
 	}
 	if docCallRes.IsError {
 		t.Fatalf("clientSession.CallTool(ctx, \"docs.v1.documents.create\") returned IsError=true: %+v", docCallRes.Content)
+	}
+
+	slidesCallRes, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Name: "slides.v1.presentations.get",
+		Arguments: map[string]any{
+			"presentationId": "pres-99",
+		},
+	})
+	if err != nil {
+		t.Fatalf("clientSession.CallTool(ctx, \"slides.v1.presentations.get\") error = %v", err)
+	}
+	if slidesCallRes.IsError {
+		t.Fatalf("clientSession.CallTool(ctx, \"slides.v1.presentations.get\") returned IsError=true: %+v", slidesCallRes.Content)
 	}
 }
 
@@ -306,6 +320,36 @@ const fakeSheetsDiscoveryJSON = `{
               },
               "request": {"$ref": "ValueRange"}
             }
+          }
+        }
+      }
+    }
+  }
+}`
+
+const fakeSlidesDiscoveryJSON = `{
+  "name": "slides",
+  "version": "v1",
+  "baseUrl": "https://slides.googleapis.com/",
+  "schemas": {
+    "Presentation": {
+      "id": "Presentation",
+      "type": "object",
+      "properties": {
+        "presentationId": {"type": "string"},
+        "title": {"type": "string"}
+      }
+    }
+  },
+  "resources": {
+    "presentations": {
+      "methods": {
+        "get": {
+          "id": "slides.presentations.get",
+          "httpMethod": "GET",
+          "path": "v1/presentations/{presentationId}",
+          "parameters": {
+            "presentationId": {"type": "string", "location": "path", "required": true}
           }
         }
       }

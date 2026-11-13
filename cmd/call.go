@@ -23,8 +23,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ghchinoy/drivectl/internal/discovery"
 	"github.com/ghchinoy/drivectl/internal/ui"
+	"github.com/ghchinoy/drivectl/pkg/discovery"
 	"github.com/spf13/cobra"
 )
 

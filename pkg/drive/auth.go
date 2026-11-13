@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package drive provides Google Drive, Docs, and Sheets API client wrappers.
+// Package drive provides Google Drive, Docs, Sheets, and Slides API client wrappers.
 package drive
 
 import (
@@ -29,8 +29,98 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/docs/v1"
 	"google.golang.org/api/drive/v3"
+	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
+	"google.golang.org/api/slides/v1"
 )
+
+// Services bundles pre-configured Google Workspace API clients sharing an HTTP client.
+type Services struct {
+	Client *http.Client
+	Drive  *drive.Service
+	Docs   *docs.Service
+	Sheets *sheets.Service
+	Slides *slides.Service
+}
+
+// NewClientFromTokenSource returns an *http.Client backed by the provided oauth2.TokenSource.
+// It performs no disk I/O and writes nothing to stdout.
+func NewClientFromTokenSource(ctx context.Context, ts oauth2.TokenSource) *http.Client {
+	return oauth2.NewClient(ctx, ts)
+}
+
+// NewClientFromBearerToken returns a stateless *http.Client that attaches the given OAuth2 access token.
+// It performs no disk I/O and writes nothing to stdout.
+func NewClientFromBearerToken(ctx context.Context, accessToken string) *http.Client {
+	ts := oauth2.StaticTokenSource(&oauth2.Token{
+		AccessToken: accessToken,
+		TokenType:   "Bearer",
+	})
+	return NewClientFromTokenSource(ctx, ts)
+}
+
+// NewDriveService creates a *drive.Service backed by client.
+func NewDriveService(ctx context.Context, client *http.Client) (*drive.Service, error) {
+	srv, err := drive.NewService(ctx, option.WithHTTPClient(client))
+	if err != nil {
+		return nil, fmt.Errorf("could not create drive service: %w", err)
+	}
+	return srv, nil
+}
+
+// NewDocsService creates a *docs.Service backed by client.
+func NewDocsService(ctx context.Context, client *http.Client) (*docs.Service, error) {
+	srv, err := docs.NewService(ctx, option.WithHTTPClient(client))
+	if err != nil {
+		return nil, fmt.Errorf("could not create docs service: %w", err)
+	}
+	return srv, nil
+}
+
+// NewSheetsService creates a *sheets.Service backed by client.
+func NewSheetsService(ctx context.Context, client *http.Client) (*sheets.Service, error) {
+	srv, err := sheets.NewService(ctx, option.WithHTTPClient(client))
+	if err != nil {
+		return nil, fmt.Errorf("could not create sheets service: %w", err)
+	}
+	return srv, nil
+}
+
+// NewSlidesService creates a *slides.Service backed by client.
+func NewSlidesService(ctx context.Context, client *http.Client) (*slides.Service, error) {
+	srv, err := slides.NewService(ctx, option.WithHTTPClient(client))
+	if err != nil {
+		return nil, fmt.Errorf("could not create slides service: %w", err)
+	}
+	return srv, nil
+}
+
+// NewServicesFromClient initializes Drive, Docs, Sheets, and Slides services from a single *http.Client.
+func NewServicesFromClient(ctx context.Context, client *http.Client) (*Services, error) {
+	driveSvc, err := NewDriveService(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+	docsSvc, err := NewDocsService(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+	sheetsSvc, err := NewSheetsService(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+	slidesSvc, err := NewSlidesService(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+	return &Services{
+		Client: client,
+		Drive:  driveSvc,
+		Docs:   docsSvc,
+		Sheets: sheetsSvc,
+		Slides: slidesSvc,
+	}, nil
+}
 
 // ConfigDir returns the path to the application's config directory.
 func ConfigDir() (string, error) {
@@ -60,7 +150,14 @@ func NewOAuthClient(ctx context.Context, secretFile string, noBrowserAuth bool) 
 		return nil, fmt.Errorf("unable to read client secret file at %q: %w", secretFile, err)
 	}
 
-	config, err := google.ConfigFromJSON(b, drive.DriveReadonlyScope, docs.DocumentsReadonlyScope, sheets.SpreadsheetsScope, drive.DriveFileScope)
+	config, err := google.ConfigFromJSON(
+		b,
+		drive.DriveReadonlyScope,
+		docs.DocumentsReadonlyScope,
+		sheets.SpreadsheetsScope,
+		slides.PresentationsReadonlyScope,
+		drive.DriveFileScope,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse client secret file to config: %w", err)
 	}

@@ -15,6 +15,7 @@
 package drive
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"os"
@@ -27,8 +28,8 @@ import (
 	"golang.org/x/oauth2"
 	"google.golang.org/api/docs/v1"
 	"google.golang.org/api/drive/v3"
-	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
+	"google.golang.org/api/slides/v1"
 )
 
 func TestMarkdownToDocsRequests(t *testing.T) {
@@ -149,9 +150,41 @@ func TestTokenRoundTrip(t *testing.T) {
 	}
 }
 
-func TestDriveDocsAndSheetsServices(t *testing.T) {
+func TestNewClientFromBearerTokenAndServices(t *testing.T) {
+	var gotAuthHeader string
+	baseHTTP := &http.Client{
+		Transport: fakeRoundTripper(func(req *http.Request) (*http.Response, error) {
+			gotAuthHeader = req.Header.Get("Authorization")
+			return jsonHTTPResponse(req, http.StatusOK, `{"files":[{"id":"f1","name":"Notes.txt"}]}`), nil
+		}),
+	}
+
+	ctx := context.WithValue(t.Context(), oauth2.HTTPClient, baseHTTP)
+	bearerClient := NewClientFromBearerToken(ctx, "stateless-token-xyz")
+
+	svcs, err := NewServicesFromClient(ctx, bearerClient)
+	if err != nil {
+		t.Fatalf("NewServicesFromClient(ctx, bearerClient) error = %v", err)
+	}
+	if svcs.Drive == nil || svcs.Docs == nil || svcs.Sheets == nil || svcs.Slides == nil {
+		t.Fatalf("NewServicesFromClient(ctx, bearerClient) = %+v, want non-nil Drive, Docs, Sheets, and Slides", svcs)
+	}
+
+	files, err := ListFiles(svcs.Drive, 5, "")
+	if err != nil {
+		t.Fatalf("ListFiles(svcs.Drive, 5, \"\") error = %v", err)
+	}
+	if len(files) != 1 || files[0].Id != "f1" {
+		t.Errorf("ListFiles(svcs.Drive, 5, \"\") = %+v, want 1 file \"f1\"", files)
+	}
+	if gotAuthHeader != "Bearer stateless-token-xyz" {
+		t.Errorf("Authorization header = %q, want \"Bearer stateless-token-xyz\"", gotAuthHeader)
+	}
+}
+
+func TestDriveDocsSheetsAndSlidesServices(t *testing.T) {
 	ctx := t.Context()
-	driveSvc, docsSvc, sheetsSvc := newFakeServices(t, ctx)
+	driveSvc, docsSvc, sheetsSvc, slidesSvc := newFakeServices(t, ctx)
 
 	files, err := ListFiles(driveSvc, 10, "")
 	if err != nil {
@@ -249,20 +282,30 @@ func TestDriveDocsAndSheetsServices(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FetchSheetAsCSV(sheetsSvc, \"sp1\", \"Sheet1\") error = %v", err)
 	}
-	if csvText != "Name,Score\nAlice,95\n" {
-		t.Errorf("FetchSheetAsCSV(sheetsSvc, \"sp1\", \"Sheet1\") = %q, want \"Name,Score\\nAlice,95\\n\"", csvText)
+	wantCSV := "Name,Description,Score\nAlice,\"Needs review, \"\"urgent\"\"\",95\nBob,\"Line 1\nLine 2\",88\n"
+	if csvText != wantCSV {
+		t.Errorf("FetchSheetAsCSV(sheetsSvc, \"sp1\", \"Sheet1\") = %q, want %q", csvText, wantCSV)
 	}
 
 	vals, err := FetchSheetRange(sheetsSvc, "sp1", "Sheet1", "A1:B2")
 	if err != nil {
 		t.Fatalf("FetchSheetRange(sheetsSvc, \"sp1\", \"Sheet1\", \"A1:B2\") error = %v", err)
 	}
-	if len(vals) != 2 {
-		t.Errorf("len(FetchSheetRange(sheetsSvc, \"sp1\", \"Sheet1\", \"A1:B2\")) = %d, want 2", len(vals))
+	if len(vals) != 3 {
+		t.Errorf("len(FetchSheetRange(sheetsSvc, \"sp1\", \"Sheet1\", \"A1:B2\")) = %d, want 3", len(vals))
 	}
 
 	if err := UpdateSheetRange(sheetsSvc, "sp1", "Sheet1", "B2", [][]any{{"100"}}); err != nil {
 		t.Fatalf("UpdateSheetRange(sheetsSvc, \"sp1\", \"Sheet1\", \"B2\", ...) error = %v", err)
+	}
+
+	presMD, err := FetchPresentationAsMarkdown(slidesSvc, "pres1")
+	if err != nil {
+		t.Fatalf("FetchPresentationAsMarkdown(slidesSvc, \"pres1\") error = %v", err)
+	}
+	wantPresMD := "# Q4 Roadmap\n\n## Slide 1\n\nKey Objectives\n| Goal | Owner |\n| Reliability | SRE |\n\n### Speaker Notes\n\nEmphasize latency targets.\n"
+	if presMD != wantPresMD {
+		t.Errorf("FetchPresentationAsMarkdown(slidesSvc, \"pres1\") = %q, want %q", presMD, wantPresMD)
 	}
 }
 
@@ -283,11 +326,7 @@ func jsonHTTPResponse(req *http.Request, status int, body string) *http.Response
 	}
 }
 
-func newFakeServices(t *testing.T, ctx interface {
-	Done() <-chan struct{}
-	Err() error
-	Value(any) any
-}) (*drive.Service, *docs.Service, *sheets.Service) {
+func newFakeServices(t *testing.T, ctx context.Context) (*drive.Service, *docs.Service, *sheets.Service, *slides.Service) {
 	t.Helper()
 
 	httpClient := &http.Client{
@@ -330,28 +369,41 @@ func newFakeServices(t *testing.T, ctx interface {
 			case req.Method == http.MethodGet && path == "/v4/spreadsheets/sp1":
 				return jsonHTTPResponse(req, http.StatusOK, `{"sheets":[{"properties":{"title":"Sheet1"}},{"properties":{"title":"Metrics"}}]}`), nil
 			case req.Method == http.MethodGet && strings.HasPrefix(path, "/v4/spreadsheets/sp1/values/"):
-				return jsonHTTPResponse(req, http.StatusOK, `{"values":[["Name","Score"],["Alice","95"]]}`), nil
+				return jsonHTTPResponse(req, http.StatusOK, `{"values":[["Name","Description","Score"],["Alice","Needs review, \"urgent\"","95"],["Bob","Line 1\nLine 2","88"]]}`), nil
 			case req.Method == http.MethodPut && strings.HasPrefix(path, "/v4/spreadsheets/sp1/values/"):
 				return jsonHTTPResponse(req, http.StatusOK, `{"updatedCells":1}`), nil
+			case req.Method == http.MethodGet && path == "/v1/presentations/pres1":
+				return jsonHTTPResponse(req, http.StatusOK, `{
+					"presentationId":"pres1",
+					"title":"Q4 Roadmap",
+					"slides":[{
+						"objectId":"s1",
+						"pageElements":[
+							{"objectId":"el1","shape":{"text":{"textElements":[{"textRun":{"content":"Key Objectives\n"}}]}} },
+							{"objectId":"tbl1","table":{"tableRows":[
+								{"tableCells":[{"text":{"textElements":[{"textRun":{"content":"Goal\n"}}]}},{"text":{"textElements":[{"textRun":{"content":"Owner\n"}}]}}]},
+								{"tableCells":[{"text":{"textElements":[{"textRun":{"content":"Reliability\n"}}]}},{"text":{"textElements":[{"textRun":{"content":"SRE\n"}}]}}]}
+							]}}
+						],
+						"slideProperties":{
+							"notesPage":{
+								"notesProperties":{"speakerNotesObjectId":"notes1"},
+								"pageElements":[
+									{"objectId":"notes1","shape":{"text":{"textElements":[{"textRun":{"content":"Emphasize latency targets.\n"}}]}}}
+								]
+							}
+						}
+					}]
+				}`), nil
 			default:
 				return jsonHTTPResponse(req, http.StatusNotFound, `{"error":"not found"}`), nil
 			}
 		}),
 	}
 
-	c := t.Context()
-	_ = ctx
-	driveSvc, err := drive.NewService(c, option.WithHTTPClient(httpClient))
+	svcs, err := NewServicesFromClient(ctx, httpClient)
 	if err != nil {
-		t.Fatalf("drive.NewService() error = %v", err)
+		t.Fatalf("NewServicesFromClient() error = %v", err)
 	}
-	docsSvc, err := docs.NewService(c, option.WithHTTPClient(httpClient))
-	if err != nil {
-		t.Fatalf("docs.NewService() error = %v", err)
-	}
-	sheetsSvc, err := sheets.NewService(c, option.WithHTTPClient(httpClient))
-	if err != nil {
-		t.Fatalf("sheets.NewService() error = %v", err)
-	}
-	return driveSvc, docsSvc, sheetsSvc
+	return svcs.Drive, svcs.Docs, svcs.Sheets, svcs.Slides
 }
