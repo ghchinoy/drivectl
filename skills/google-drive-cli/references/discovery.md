@@ -38,11 +38,13 @@ drivectl call docs.v1.documents.create --payload '{"title": "My New Document"}' 
 ```
 *Here, the JSON is mapped to the request body as the document representation.*
 
-**Example 3: Adding a reader permission to a file (Drive)**
+**Example 3: Adding a reader permission to a file silently (Drive)**
 ```bash
-drivectl call drive.v3.permissions.create --payload '{"fileId": "YOUR_FILE_ID", "role": "reader", "type": "user", "emailAddress": "user@example.com"}' -O json
+drivectl call drive.v3.permissions.create --payload '{"fileId": "YOUR_FILE_ID", "sendNotificationEmail": false, "supportsAllDrives": true, "role": "reader", "type": "user", "emailAddress": "user@example.com"}' -O json
 ```
-*Here, `fileId` goes to the URL path, and `role`, `type`, and `emailAddress` go into the request body.*
+*Here, `fileId` goes to the URL path, `sendNotificationEmail` and `supportsAllDrives` map to the URL query string, and `role`, `type`, and `emailAddress` go into the request body.*
+
+> **Warning:** Google Drive API v3 defaults `sendNotificationEmail=true` on `user` and `group` permission grants when omitted, and raw `drive.v3.permissions.create` calls lack a pre-grant role check. Always pass `"sendNotificationEmail": false` and `"supportsAllDrives": true`, or prefer [`share-with`](https://github.com/ghchinoy/share-with) for silent-only permission grants, `?resourcekey=...` URL parsing, and no-downgrade collaborator protection.
 
 ## Finding the Right Method and Parameters
 

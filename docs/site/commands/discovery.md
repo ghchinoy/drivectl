@@ -27,9 +27,9 @@ drivectl call drive.v3.files.get \
   --payload '{"fileId": "YOUR_FILE_ID", "fields": "id,name,mimeType,owners"}' \
   -O json
 
-# Grant reader permission on a file
+# Grant reader permission on a file silently (including Shared Drives)
 drivectl call drive.v3.permissions.create \
-  --payload '{"fileId": "YOUR_FILE_ID", "role": "reader", "type": "user", "emailAddress": "teammate@example.com"}' \
+  --payload '{"fileId": "YOUR_FILE_ID", "sendNotificationEmail": false, "supportsAllDrives": true, "role": "reader", "type": "user", "emailAddress": "teammate@example.com"}' \
   -O json
 
 # Create a new Google Doc via the Docs v1 API
@@ -37,6 +37,10 @@ drivectl call docs.v1.documents.create \
   --payload '{"title": "Q4 Architecture Review"}' \
   -O json
 ```
+
+:::caution[Silent Permission Grants & ACL Safety]
+Google Drive API v3 defaults `sendNotificationEmail=true` on `user` and `group` permission grants when omitted, and raw `drive.v3.permissions.create` calls do not inspect existing permissions before writing. Always include `"sendNotificationEmail": false` and `"supportsAllDrives": true` when calling `drive.v3.permissions.create` directly, or use the sister CLI [`share-with`](https://github.com/ghchinoy/share-with) ([documentation](https://ghchinoy.github.io/share-with/)) for transport-enforced silent-only permission grants, `?resourcekey=...` URL parsing, and pre-grant no-downgrade collaborator protection.
+:::
 
 ## Multi-step recipes (`run`)
 

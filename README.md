@@ -7,7 +7,8 @@
 A Go command-line interface (CLI) and Model Context Protocol (MCP) server for interacting with **Google Drive**, **Google Docs**, and **Google Sheets**, plus dynamic calls to any Google Workspace REST endpoint via Google API Discovery Documents. Built for both interactive terminal workflows and AI coding agents with deterministic JSON output (`-O json`), Markdown-to-Docs AST conversion, and multi-step JSON recipes.
 
 > [!NOTE]
-> For active production Google Workspace integrations, also see the [Gemini CLI Workspace Extension](https://github.com/gemini-cli-extensions/workspace) and the [Google Workspace CLI (`gws`)](https://github.com/googleworkspace/cli).
+> - **Sister CLI (`share-with`):** Choose `drivectl` for Drive search, binary uploads, bidirectional Markdown $\leftrightarrow$ Google Docs AST conversion, Sheets A1 ranges, dynamic Discovery calls, and MCP server mode. For Google Drive ACL and sharing workflows, use [`share-with`](https://github.com/ghchinoy/share-with) ([docs](https://ghchinoy.github.io/share-with/)), which enforces silent-only permission grants (`sendNotificationEmail=false` at the HTTP transport layer), `?resourcekey=...` URL parsing, and pre-grant no-downgrade collaborator protection.
+> - **Ecosystem tools:** For broader Google Workspace integrations, also see the [Gemini CLI Workspace Extension](https://github.com/gemini-cli-extensions/workspace) and the [Google Workspace CLI (`gws`)](https://github.com/googleworkspace/cli).
 
 ## Table of Contents
 

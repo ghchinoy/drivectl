@@ -22,6 +22,12 @@ It is designed for both human developers working in an interactive shell and AI 
 - **Dynamic API Discovery (`call`):** Invoke any Google Workspace REST endpoint (`drive.v3.*`, `docs.v1.*`, `sheets.v4.*`) by passing a method identifier and a JSON `--payload`. `drivectl` inspects the live Discovery schema to route parameters to path variables, query strings, or the request body automatically.
 - **Agent-native output & MCP server:** Pass `-O json` to any command for machine-readable output, or launch `drivectl --mcp` (stdio) / `drivectl --mcp-http :8080` to expose Workspace tools directly to MCP clients.
 
+:::tip[Choosing between `drivectl` and `share-with`]
+Use **`drivectl`** for Google Drive search, binary uploads, Markdown $\leftrightarrow$ Google Docs AST conversion, Sheets A1 cell ranges, dynamic Discovery calls, and MCP server mode.
+
+For dedicated Google Drive sharing and ACL management, use the sister CLI [**`share-with`**](https://github.com/ghchinoy/share-with) ([documentation](https://ghchinoy.github.io/share-with/)), which enforces silent-only permission grants (`sendNotificationEmail=false` at the HTTP transport layer), parses `?resourcekey=...` links, and guards against accidental collaborator role downgrades.
+:::
+
 ## Learn more
 
 Read the [Design Philosophy](../../docs/DESIGN_PHILOSOPHY.md), browse the [bundled Agent Skill](../../skills/google-drive-cli/SKILL.md), or inspect the [release workflow](../../docs/RELEASING.md).

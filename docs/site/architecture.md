@@ -14,6 +14,10 @@ The [`drivectl call`](/drivectl/commands/discovery) command is a lightweight bri
 - **Uncomplicated REST/JSON:** Ideal for any Google Workspace endpoint whose request and response are pure JSON (`drive.v3.permissions.create`, `docs.v1.documents.create`, `drive.v3.files.update`).
 - **Automatic parameter routing:** `internal/discovery` inspects the Discovery Document at runtime and routes payload fields to URL path templates, query parameters, or the HTTP request body.
 
+:::caution[Permission Grants via Discovery vs. `share-with`]
+Because `drivectl call` is a raw passthrough to Google Discovery, calling `drive.v3.permissions.create` without `"sendNotificationEmail": false` and `"supportsAllDrives": true` triggers Google Drive's default email notifications and fails on Shared Drives. For dedicated ACL management, use [`share-with`](https://github.com/ghchinoy/share-with) ([documentation](https://ghchinoy.github.io/share-with/)), which enforces `sendNotificationEmail=false` at the HTTP transport layer, parses `?resourcekey=...` URLs, and prevents accidental collaborator role downgrades.
+:::
+
 ### When native subcommands are used
 
 Whenever an operation involves binary streaming, multi-step protocols, or AST transformation, `drivectl` provides a dedicated subcommand under `cmd/` and `internal/drive/`:
