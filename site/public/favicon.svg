@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="1.5 1.5 21 21" width="32" height="32">
+  <style>
+    :root { --e: var(--egm-color-elephant, light-dark(#1b6ef3, #7cacf8)); --g: var(--egm-color-goldfish, light-dark(#e86e00, #ff8d41)); color-scheme: light dark; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    #e { fill: var(--e); stroke: var(--e); } #g { fill: var(--g); stroke: var(--g); } .d { stroke: none; } .t { fill: none; }
+  </style>
+  <g id="e">
+    <path class="d" d="M8.6,4.0 L13.8,4.0 L18.4,12.0 L13.2,12.0 Z"/>
+    <path class="t" d="M4.2,14.8 L8.4,7.4"/>
+  </g>
+  <g id="g">
+    <path class="d" d="M6.8,14.2 L18.2,14.2 L15.6,18.8 L4.2,18.8 Z"/>
+  </g>
+</svg>

@@ -1,172 +1,228 @@
 # drivectl
 
-An experimental command-line tool for interacting with the Google Drive API.
+[![Go Version](https://img.shields.io/github/go-mod/go-version/ghchinoy/drivectl)](go.mod)
+[![Latest Release](https://img.shields.io/github/v/release/ghchinoy/drivectl)](https://github.com/ghchinoy/drivectl/releases)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-Please review either the [Gemini CLI Workspace Extension](https://github.com/gemini-cli-extensions/workspace) or the [Workspace CLI](https://github.com/googleworkspace/cli) for more up-to-date examples of interacting with Workspace.
+A Go command-line interface (CLI) and Model Context Protocol (MCP) server for interacting with **Google Drive**, **Google Docs**, and **Google Sheets**, plus dynamic calls to any Google Workspace REST endpoint via Google API Discovery Documents. Built for both interactive terminal workflows and AI coding agents with deterministic JSON output (`-O json`), Markdown-to-Docs AST conversion, and multi-step JSON recipes.
+
+> [!NOTE]
+> For active production Google Workspace integrations, also see the [Gemini CLI Workspace Extension](https://github.com/gemini-cli-extensions/workspace) and the [Google Workspace CLI (`gws`)](https://github.com/googleworkspace/cli).
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Getting a Google OAuth Client Secret](#getting-a-google-oauth-client-secret)
+- [Usage & Command Reference](#usage--command-reference)
+  - [Authentication (`auth`)](#authentication-auth)
+  - [Google Drive Files (`list`, `describe`, `get`, `upload`, `revisions`, `comments`)](#google-drive-files-list-describe-get-upload-revisions-comments)
+  - [Google Docs (`docs`)](#google-docs-docs)
+  - [Google Sheets (`sheets`)](#google-sheets-sheets)
+  - [Dynamic Discovery Calls (`call`)](#dynamic-discovery-calls-call)
+  - [Automating Workflows (`run`)](#automating-workflows-run)
+- [MCP Server Mode](#mcp-server-mode)
+- [Agent Skill & Gemini CLI Configuration](#agent-skill--gemini-cli-configuration)
+- [Local Development](#local-development)
+- [Releasing & Publishing](#releasing--publishing)
+- [Contributing](#contributing)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
 
 ## Features
 
-*   **Robust Authentication:** Secure OAuth 2.0 login with automatic local caching and silent token refreshing.
-*   **Agent-Friendly UX:** Thoughtful CLI design with semantic command grouping, color-coded output, proactive error hints, and deterministic JSON formatting (`-O json`) to simplify LLM integration and scripting.
-*   **Dynamic API Capabilities:** A generic `call` subcommand powered by Google API Discovery Documents to hit *any* Google Workspace endpoint dynamically.
-*   **Google Drive Integration:** List files with powerful query capabilities, describe file metadata, and download files.
-*   **Google Docs Integration:** Convert Markdown files into richly formatted Google Docs, export Docs back to raw Markdown (parsing the AST), PDF, or plain text, and manage document tabs.
-*   **Google Sheets Integration:** Export sheets to CSV, read explicit cell ranges via A1 notation, and update cell values.
-*   **Composable Recipes:** Execute sequences of CLI commands defined in JSON files via `drivectl run` for complex, automated workflows.
-*   **MCP Server Mode:** Run `drivectl` as an MCP server to expose Workspace interactions directly to LLM agents using Discovery-driven schemas.
+- **Robust Authentication:** OAuth 2.0 login with automatic local credential caching (`~/.config/drivectl/`), silent token refresh, and headless `--no-browser-auth` support.
+- **Agent-Friendly UX:** Semantic command grouping (`workspace`, `api`, `config`), color-coded terminal output, proactive error hints, and deterministic JSON output (`-O json`).
+- **Dynamic API Discovery (`call`):** Invoke *any* Google Workspace REST endpoint (`drive.v3.*`, `docs.v1.*`, `sheets.v4.*`, etc.) dynamically from live Google API Discovery Documents.
+- **Google Drive Operations:** List files with Drive query syntax (`-q`), inspect file metadata (`describe`), upload local files with custom MIME types (`upload`), download or export content (`get`), and inspect revision history (`revisions`) and threaded comments (`comments`).
+- **Google Docs AST Conversion:** Convert local Markdown files into formatted Google Docs (`docs create`), export Google Docs back to Markdown, PDF, or plain text (`get --format md|pdf|txt`), and inspect document tab hierarchies (`docs tabs`).
+- **Google Sheets Operations:** Export sheets to CSV (`sheets get`), read cell ranges via A1 notation (`sheets get-range`), and update cell values (`sheets update-range`).
+- **Composable Recipes (`run`):** Execute sequential multi-step CLI workflows defined in JSON files.
+- **Dual-Mode MCP Server (`--mcp` / `--mcp-http`):** Expose native and Discovery-driven Google Workspace tools (`drive_v3_files_list`, `docs_v1_documents_get`, `sheets_v4_spreadsheets_get`) over stdio or HTTP.
 
 ## Installation
 
-### Prebuilt Binaries
+### Prebuilt Binaries (macOS & Linux)
 
-You can quickly download and extract the latest prebuilt binary directly to your current directory:
+Download and verify the latest release binary into your current directory using the bundled installer script ([`skills/google-drive-cli/scripts/install.sh`](skills/google-drive-cli/scripts/install.sh)):
 
 ```bash
 curl -sL https://raw.githubusercontent.com/ghchinoy/drivectl/main/skills/google-drive-cli/scripts/install.sh | bash
 ```
 
-### From Source
+### Go Install
 
-1.  Ensure you have Go installed on your system.
-2.  Clone this repository.
-3.  Build the tool:
-    ```bash
-    go build -o drivectl .
-    ```
-4.  (Optional) Move the `drivectl` executable to a directory in your `PATH` (e.g., `/usr/local/bin`).
-
-## Getting a Google Drive API Client Secret
-
-1.  Go to the [Google Cloud Console](https://console.cloud.google.com/).
-2.  Create a new project or select an existing one.
-3.  In the navigation menu, go to **APIs & Services > Library**.
-4.  Search for and enable the following APIs:
-    *   **Google Drive API**
-    *   **Google Docs API**
-    *   **Google Sheets API**
-5.  Go to **APIs & Services > Credentials**.
-6.  Click **Create Credentials > OAuth client ID**.
-7.  Select **Desktop app** as the application type.
-8.  Give it a name (e.g., "drivectl").
-9.  Click **Create**. A window will appear with your client ID and client secret. Click **Download JSON**.
-10. Rename the downloaded file to `client_secret.json` and keep it handy for your first login.
-
-## Usage
-
-### First-time Authentication
-
-`drivectl` handles authentication robustly. You only need to provide your client secret file once. The CLI will cache the secrets and your authorization tokens locally in `~/.config/drivectl/`, automatically refreshing your session in the background as needed.
-
-To authenticate for the first time, run:
+Requires **Go 1.26+**:
 
 ```bash
-./drivectl auth login --secret-file /path/to/your/client_secret.json
+go install github.com/ghchinoy/drivectl@latest
 ```
 
-This will automatically open your default browser. Once you grant permissions, you can return to your terminal. All subsequent commands can be run without passing the `--secret-file` flag!
-
-*(If you are on a headless system, you can use the `--no-browser-auth` flag to print a manual authorization URL).*
-
-### Dynamic Discovery Calls
-
-You can dynamically execute *any* Google API endpoint using the `call` subcommand. It fetches the latest Google Discovery schema to build the request.
+### Build from Source
 
 ```bash
-# List files using the generic discovery caller
-./drivectl call drive.v3.files.list --payload '{"pageSize": 5}'
-
-# Fetch specific fields for a known file
-./drivectl call drive.v3.files.get --payload '{"fileId": "YOUR_FILE_ID", "fields": "name,mimeType"}'
-
-# Create a new Google Doc
-./drivectl call docs.v1.documents.create --payload '{"title": "My New Document"}'
+git clone https://github.com/ghchinoy/drivectl.git
+cd drivectl
+go build -o drivectl .
 ```
 
-### Core Commands
+## Quick Start
 
-**List files**
+Once installed and provided with a Desktop OAuth `client_secret.json` (see [Getting a Google OAuth Client Secret](#getting-a-google-oauth-client-secret)):
 
 ```bash
-# List the first 100 files
-./drivectl list
+# 1. Authenticate once (caches credentials & token in ~/.config/drivectl/)
+./drivectl auth login --secret-file /path/to/client_secret.json
 
-# List up to 20 files
+# 2. List recent Google Docs as structured JSON
+./drivectl list -q "mimeType='application/vnd.google-apps.document'" --limit 5 -O json
+
+# 3. Export a Google Doc to local Markdown
+./drivectl get <document-id> --format md -o notes.md
+```
+
+## Getting a Google OAuth Client Secret
+
+1. Open the [Google Cloud Console](https://console.cloud.google.com/) and create or select a project.
+2. Navigate to **APIs & Services > Library** and enable:
+   - **Google Drive API** (`drive.googleapis.com`)
+   - **Google Docs API** (`docs.googleapis.com`)
+   - **Google Sheets API** (`sheets.googleapis.com`)
+3. Navigate to **APIs & Services > Credentials**.
+4. Click **Create Credentials > OAuth client ID** and select **Desktop app** as the application type.
+5. Download the JSON file, save it as `client_secret.json`, and pass it once to `drivectl auth login --secret-file client_secret.json`.
+
+## Usage & Command Reference
+
+| Command | Group | Purpose |
+|---|---|---|
+| `drivectl auth login` | `config` | Authenticate with Google OAuth 2.0 and cache tokens locally |
+| `drivectl list` | `workspace` | List and search files in Google Drive |
+| `drivectl describe <file-id>` | `workspace` | Fetch detailed metadata for a Drive file |
+| `drivectl get <file-id>` | `workspace` | Download a file or export a Google Doc (`raw`, `txt`, `md`, `pdf`) |
+| `drivectl upload <local-path>` | `workspace` | Upload a local file to Google Drive |
+| `drivectl revisions <file-id>` | `workspace` | List the revision history of a file |
+| `drivectl comments <file-id>` | `workspace` | List threaded comments and replies on a file |
+| `drivectl docs create <title> [md]` | `workspace` | Create a Google Doc (optionally converting a local Markdown file) |
+| `drivectl docs tabs <doc-id>` | `workspace` | Inspect the structural hierarchy of tabs in a Google Doc |
+| `drivectl sheets get <id>` | `workspace` | Export a Google Sheet tab to CSV |
+| `drivectl sheets get-range <id>` | `workspace` | Read cell values from an A1 range |
+| `drivectl sheets update-range <id> <val>` | `workspace` | Write a value to an A1 range |
+| `drivectl call <api.ver.res.method>` | `api` | Dynamically invoke any Google REST endpoint via Discovery |
+| `drivectl run <recipe.json>` | `api` | Execute a sequence of `drivectl` commands from a JSON recipe |
+| `drivectl --mcp` / `--mcp-http :8080` | root flags | Run `drivectl` as an MCP server over stdio or HTTP |
+
+### Authentication (`auth`)
+
+`drivectl` caches your client secret and OAuth token in `~/.config/drivectl/` and refreshes tokens automatically.
+
+```bash
+# Browser-based OAuth login (default)
+./drivectl auth login --secret-file /path/to/client_secret.json
+
+# Headless / remote session login (prints manual authorization URL)
+./drivectl auth login --secret-file /path/to/client_secret.json --no-browser-auth
+```
+
+### Google Drive Files (`list`, `describe`, `get`, `upload`, `revisions`, `comments`)
+
+#### List and search files
+
+```bash
+# List the first 20 files
 ./drivectl list --limit 20
 
-# List all Google Docs using Drive query syntax
-./drivectl list -q "mimeType='application/vnd.google-apps.document'"
+# Search using Google Drive query syntax and emit JSON
+./drivectl list -q "name contains 'Proposal' and trashed = false" -O json
 ```
 
-**Get file content**
+#### Describe file metadata and download content
 
 ```bash
-# Download a file to stdout
+# Inspect full file metadata
+./drivectl describe <file-id> -O json
+
+# Download raw file content to stdout
 ./drivectl get <file-id>
 
-# Export a Google Doc as Markdown
+# Export a Google Doc as Markdown or PDF
 ./drivectl get <google-doc-id> --format md -o my-document.md
+./drivectl get <google-doc-id> --format pdf -o my-document.pdf
 ```
 
-**View file history and collaboration**
+#### Upload local files
 
 ```bash
-# View the revision history of a file
-./drivectl revisions <file-id>
+# Upload a file to the root of My Drive
+./drivectl upload ./report.pdf --name "Q3 Report.pdf"
 
-# View threaded comments on a file
-./drivectl comments <file-id>
+# Upload into a specific folder with an explicit MIME type
+./drivectl upload ./data.csv --parent <folder-id> --mime-type text/csv -O json
 ```
 
-### Google Docs & Sheets
-
-**Create a Google Doc from Markdown**
+#### View file revisions and comments
 
 ```bash
-# Converts the markdown file into a formatted Google Doc
-./drivectl docs create "My New Design Doc" ./docs/design.md
+# View revision history
+./drivectl revisions <file-id> -O json
+
+# View threaded comments
+./drivectl comments <file-id> -O json
 ```
 
-**List Google Doc Tabs**
+### Google Docs (`docs`)
+
+#### Create a Google Doc from Markdown
 
 ```bash
-# View the structural hierarchy of tabs in a Doc
-./drivectl docs tabs <document-id>
+# Convert a local Markdown file into a formatted Google Doc
+./drivectl docs create "Architecture Design Doc" ./docs/DESIGN_PHILOSOPHY.md -O json
 ```
 
-**Interact with Google Sheets**
+#### List Google Doc tabs
 
 ```bash
-# Export a sheet as a CSV
+# View the hierarchy of tabs and child tabs in a Document
+./drivectl docs tabs <document-id> -O json
+```
+
+### Google Sheets (`sheets`)
+
+```bash
+# Export a sheet tab as CSV to stdout
 ./drivectl sheets get <spreadsheet-id> --sheet "Sheet1"
 
-# Get values using A1 notation
-./drivectl sheets get-range <spreadsheet-id> --sheet "Sheet1" --range "A1:C5"
+# Read a specific A1 range
+./drivectl sheets get-range <spreadsheet-id> --sheet "Sheet1" --range "A1:C5" -O json
 
-# Update a specific cell
-./drivectl sheets update-range <spreadsheet-id> "New Value" --sheet "Sheet1" --range "B2"
+# Update a cell or range
+./drivectl sheets update-range <spreadsheet-id> "Approved" --sheet "Sheet1" --range "B2" -O json
 ```
 
-### Advanced Workflows
+### Dynamic Discovery Calls (`call`)
 
-**Deterministic JSON Output**
-
-All commands support a `-O json` flag to bypass terminal UI formatting and emit pure, parseable JSON for shell pipelines or AI agents.
+Use `drivectl call` to invoke any Google API endpoint described by Google's Discovery Service. Key names in `--payload` are automatically routed to path parameters, query parameters, or the JSON request body based on the Discovery schema:
 
 ```bash
-# Get structured JSON output of Drive files
-./drivectl list -q "name contains 'Project'" -O json
+# List files via drive.v3.files.list
+./drivectl call drive.v3.files.list --payload '{"pageSize": 5}' -O json
+
+# Fetch specific fields for a known file
+./drivectl call drive.v3.files.get --payload '{"fileId": "YOUR_FILE_ID", "fields": "name,mimeType"}' -O json
+
+# Create a new Google Doc via docs.v1.documents.create
+./drivectl call docs.v1.documents.create --payload '{"title": "My New Document"}' -O json
 ```
 
-**Executing CLI Recipes**
+### Automating Workflows (`run`)
 
-You can string multiple `drivectl` commands together using a JSON recipe file to automate redundant tasks.
+Chain multiple `drivectl` commands in a declarative JSON recipe ([`recipes/sample.json`](recipes/sample.json)):
 
 ```bash
-# Run the sequential steps defined in a recipe
 ./drivectl run recipes/sample.json
 ```
 
-*Example Recipe (`recipes/sample.json`):*
 ```json
 {
   "name": "Quick Diagnostics",
@@ -179,31 +235,96 @@ You can string multiple `drivectl` commands together using a JSON recipe file to
 
 ## MCP Server Mode
 
-`drivectl` can also be run as an MCP server, exposing its commands as tools that can be called by an MCP client (like Gemini).
-
-### Starting the Server
-
-**Stdio Mode (Default for Agents):**
+`drivectl` includes a built-in Model Context Protocol (MCP) server (`github.com/modelcontextprotocol/go-sdk`) that exposes both native tools (`drivectl_list`, `drivectl_read`, `drivectl_call`) and dynamically generated Discovery tools (`drive_v3_files_list`, `docs_v1_documents_get`, `sheets_v4_spreadsheets_get`).
 
 ```bash
+# Start MCP server over stdio (default for AI coding agents)
 ./drivectl --mcp
-```
 
-**HTTP Mode:**
-
-```bash
+# Start MCP server over HTTP (Streamable HTTP + SSE compatibility)
 ./drivectl --mcp-http :8080
 ```
 
-## Gemini CLI Configuration
+## Agent Skill & Gemini CLI Configuration
 
-This repository contains a sample `settings.json.sample` file. To use this tool with the Gemini CLI, you should copy this file to `.gemini/settings.json` in your project root and replace the placeholder values with your actual configuration.
+- **Bundled Agent Skill:** [`skills/google-drive-cli/SKILL.md`](skills/google-drive-cli/SKILL.md) provides progressive-disclosure instructions and references ([`drive.md`](skills/google-drive-cli/references/drive.md), [`docs.md`](skills/google-drive-cli/references/docs.md), [`sheets.md`](skills/google-drive-cli/references/sheets.md), [`discovery.md`](skills/google-drive-cli/references/discovery.md)) for AI coding agents.
+- **Gemini CLI:** Copy [`settings.json.sample`](settings.json.sample) to `.gemini/settings.json` in your project root and update the binary path to register `drivectl` as an MCP server.
 
-# License
+## Local Development
 
-Apache-2.0
+### Prerequisites
 
-# Disclaimer
+- **Go 1.26+** (pinned to `go 1.26.11` in [`go.mod`](go.mod))
+- **golangci-lint v2** (optional, for complexity and static analysis linting)
+- **Node.js 22+** (optional, for building the Astro Starlight documentation site in `site/`)
+
+### Build, Test, and Lint
+
+```bash
+# Clone the repository
+git clone https://github.com/ghchinoy/drivectl.git
+cd drivectl
+
+# Build the CLI binary
+go build -o drivectl .
+
+# Run unit and in-memory MCP integration tests with the race detector
+go test -p 2 -race ./...
+
+# Run linters and complexity checks (.golangci.yml)
+golangci-lint run -E gocyclo -E cyclop -E gocognit ./...
+
+# Check for known vulnerabilities
+go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+```
+
+### Documentation Site (`site/`)
+
+```bash
+cd site
+npm install
+ASTRO_TELEMETRY_DISABLED=1 npm run check
+ASTRO_TELEMETRY_DISABLED=1 npm run build
+npm run check:docs
+```
+
+## Releasing & Publishing
+
+Releases are automated via [GoReleaser](https://goreleaser.com/) and GitHub Actions ([`.github/workflows/release.yaml`](.github/workflows/release.yaml)). Pushing a semantic version tag builds cross-platform archives (`Darwin` and `Linux` on `x86_64` and `arm64`) and publishes SHA-256 checksums to GitHub Releases:
+
+```bash
+git checkout main && git pull
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+To test a release build locally without publishing:
+
+```bash
+goreleaser release --snapshot --clean
+```
+
+See [`docs/RELEASING.md`](docs/RELEASING.md) for the full release checklist.
+
+## Contributing
+
+Issues and pull requests are welcome! Before opening a pull request:
+
+1. Read [`docs/DESIGN_PHILOSOPHY.md`](docs/DESIGN_PHILOSOPHY.md) to decide whether a feature belongs in the generic `call` command (standard JSON REST endpoints) or a dedicated native subcommand (streaming media, multi-step protocols, or AST conversion).
+2. Ensure `go test -p 2 -race ./...` and `golangci-lint run -E gocyclo -E cyclop -E gocognit ./...` pass with zero issues.
+3. For larger changes, open an issue first to discuss the design.
+
+## Troubleshooting
+
+- **`authentication required: credentials file not found`:** Run `drivectl auth login --secret-file /path/to/client_secret.json` once to initialize `~/.config/drivectl/credentials.json` and `token.json`.
+- **Browser does not open on a remote or SSH host:** Pass `--no-browser-auth` to `drivectl auth login` and open the printed authorization URL on your local machine.
+- **`403 Forbidden: Google Docs/Sheets API has not been used in project`:** Enable the corresponding API (`drive.googleapis.com`, `docs.googleapis.com`, `sheets.googleapis.com`) in the Google Cloud Console for the project that owns your OAuth client ID.
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).
+
+## Disclaimer
 
 > [!CAUTION]
 > This is **not** an officially supported Google product.

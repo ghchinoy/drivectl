@@ -1,0 +1,94 @@
+---
+const repo = 'https://github.com/ghchinoy/drivectl';
+import ThemeSelect from './docs/ThemeSelect.astro';
+
+const links = [
+  { label: 'Apache 2.0', href: `${repo}/blob/HEAD/LICENSE` },
+  { label: 'GitHub', href: repo },
+  { label: 'Releases', href: `${repo}/releases` },
+];
+---
+
+<footer class="footer">
+  <div class="wrap">
+    <hr class="divider" />
+    <div class="bar">
+      <p class="legal muted">
+        <span>drivectl</span>
+        <span class="sep" aria-hidden="true">&middot;</span>
+        <span>This is not an officially supported Google product.</span>
+      </p>
+      <nav aria-label="Footer">
+        <ul>
+          {
+            links.map((link) => (
+              <li>
+                <a href={link.href} target="_blank" rel="noopener">
+                  {link.label}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+        <ThemeSelect />
+      </nav>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    padding-block: 0 40px;
+    position: relative;
+    z-index: 20;
+    background: var(--md-sys-color-surface);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px 24px;
+    padding-block-start: 16px;
+  }
+
+  .legal {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    font: var(--md-sys-typescale-label-md);
+    font-weight: 400;
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  nav { display: flex; align-items: center; gap: 16px; }
+
+  ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+  }
+
+  li a {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 24px;
+    font: var(--md-sys-typescale-label-md);
+    text-decoration: none;
+    color: var(--md-sys-color-on-surface-variant);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  li a:hover {
+    color: var(--md-sys-color-on-surface);
+    text-decoration: underline;
+  }
+</style>

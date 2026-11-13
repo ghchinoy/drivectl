@@ -1,0 +1,53 @@
+---
+interface Props {
+  variant?: 'split' | 'workspace' | 'agent';
+  size?: number | string;
+  width?: number | string;
+  height?: number | string;
+  class?: string;
+  'aria-hidden'?: boolean | 'true' | 'false';
+}
+
+const {
+  variant = 'split',
+  size,
+  width = size ?? (variant === 'split' ? 28 : 56),
+  height = size ?? (variant === 'split' ? 28 : 56),
+  class: className,
+  'aria-hidden': ariaHidden = true,
+} = Astro.props;
+
+const viewBox = '1.5 1.5 21.0 21.0';
+---
+
+<svg
+  viewBox={viewBox}
+  width={width}
+  height={height}
+  class={className}
+  aria-hidden={ariaHidden ? 'true' : undefined}
+>
+  {(variant === 'split' || variant === 'workspace') && (
+    <g class="workspace-mark">
+      <path
+        d="M8.6,4.0 L13.8,4.0 L18.4,12.0 L13.2,12.0 Z"
+        fill="var(--egm-color-elephant)"
+      />
+      <path
+        d="M4.2,14.8 L8.4,7.4"
+        fill="none"
+        stroke="var(--egm-color-elephant)"
+        stroke-width="2.4"
+        stroke-linecap="round"
+      />
+    </g>
+  )}
+  {(variant === 'split' || variant === 'agent') && (
+    <g class="agent-mark">
+      <path
+        d="M6.8,14.2 L18.2,14.2 L15.6,18.8 L4.2,18.8 Z"
+        fill="var(--egm-color-goldfish)"
+      />
+    </g>
+  )}
+</svg>

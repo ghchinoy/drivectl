@@ -48,3 +48,10 @@ dolt-server*
 .beads/proxieddb/
 *.gate.lock*
 *.db
+
+# Astro Starlight documentation site build artifacts
+site/node_modules/
+site/dist/
+site/.astro/
+!site/public/**/*.svg
+!site/src/assets/**/*.svg

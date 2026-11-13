@@ -11,6 +11,7 @@ When working with `drivectl`, run the following quality gates before committing:
 * **Dependencies:** `go mod tidy`
 * **Vulnerability Check:** `go run golang.org/x/vuln/cmd/govulncheck@latest ./...`
 * **Linting & Code Health:** `golangci-lint run -E gocyclo -E cyclop -E gocognit ./...` (configured via `.golangci.yml` v2)
+* **Documentation Site (`site/`):** `cd site && ASTRO_TELEMETRY_DISABLED=1 npm run check && ASTRO_TELEMETRY_DISABLED=1 npm run build && npm run check:docs`
 
 ## Architecture & Design
 

@@ -1,0 +1,37 @@
+---
+interface Props {
+  color?: 'filled' | 'elevated' | 'tonal' | 'outlined' | 'text';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
+  href?: string;
+  target?: '_blank' | '_self';
+  class?: string;
+  label?: string;
+  popovertarget?: string;
+  'aria-haspopup'?: 'menu';
+  [key: `data-${string}`]: string | undefined;
+}
+
+const { color = 'text', size = 'sm', href, target, class: className, label, ...data } = Astro.props;
+const classes = ['ripple', 'focus-ring-outer', 'btn', `btn-${color}`, `btn-${size}`, className]
+  .filter(Boolean)
+  .join(' ');
+const rel = target === '_blank' ? 'noopener' : undefined;
+---
+
+{
+  href ? (
+    <a class={classes} href={href} target={target} rel={rel} aria-label={label} {...data}>
+      <slot />
+    </a>
+  ) : (
+    <button type="button" class={classes} aria-label={label} {...data}>
+      <slot />
+    </button>
+  )
+}
+
+<style>
+  a.btn {
+    text-decoration: none;
+  }
+</style>
