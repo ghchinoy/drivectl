@@ -31,21 +31,13 @@ var commentsCmd = &cobra.Command{
 	Long:    `Retrieves and displays the comment history for a given file ID from the Google Drive API.`,
 	Example: `  drivectl comments <file-id>`,
 	Args:    cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fileId := args[0]
-		comments, err := drive.ListComments(driveSvc, fileId)
+	RunE: func(_ *cobra.Command, args []string) error {
+		fileID := args[0]
+		comments, err := drive.ListComments(driveSvc, fileID)
 		if err != nil {
-			hint := "Check if the file ID is correct and you have permission to view comments."
-			if strings.Contains(err.Error(), "500") || strings.Contains(err.Error(), "403") {
-				if file, describeErr := drive.DescribeFile(driveSvc, fileId); describeErr == nil {
-					if file.CopyRequiresWriterPermission {
-						hint = "This document has download/copy restrictions enabled, which can cause the Google API to reject comments requests."
-					} else {
-						hint = "The Google API returned an error. This can sometimes happen if the document has DLP policies or other strict restrictions."
-					}
-				}
-			}
-			return ui.ErrorWithHint(fmt.Errorf("unable to retrieve comments: %w", err), hint)
+			hint := commentsErrorHint(fileID, err)
+			wrapped := fmt.Errorf("unable to retrieve comments: %w", err)
+			return ui.ErrorWithHint(wrapped, hint)
 		}
 
 		if OutputFormat == "json" {
@@ -62,21 +54,19 @@ var commentsCmd = &cobra.Command{
 			return nil
 		}
 
-		fmt.Println(ui.Accent(fmt.Sprintf("Comments for %s:", fileId)))
+		fmt.Println(ui.Accent(fmt.Sprintf("Comments for %s:", fileID)))
 		for _, comment := range comments {
 			author := "Unknown"
 			if comment.Author != nil {
 				author = comment.Author.DisplayName
 			}
-			
-			// Display the main comment
+
 			fmt.Printf("\n[%s] %s\n", ui.Muted(comment.CreatedTime), ui.ID(author))
 			if comment.QuotedFileContent != nil && comment.QuotedFileContent.Value != "" {
 				fmt.Printf("%s\n", ui.Muted(fmt.Sprintf("  > %s", comment.QuotedFileContent.Value)))
 			}
 			fmt.Printf("  %s\n", comment.Content)
-			
-			// Display replies
+
 			for _, reply := range comment.Replies {
 				replyAuthor := "Unknown"
 				if reply.Author != nil {
@@ -88,6 +78,21 @@ var commentsCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func commentsErrorHint(fileID string, err error) string {
+	hint := "Check if the file ID is correct and you have permission to view comments."
+	if !strings.Contains(err.Error(), "500") && !strings.Contains(err.Error(), "403") {
+		return hint
+	}
+	file, describeErr := drive.DescribeFile(driveSvc, fileID)
+	if describeErr != nil {
+		return hint
+	}
+	if file.CopyRequiresWriterPermission {
+		return "This document has download/copy restrictions enabled, which can cause the Google API to reject comments requests."
+	}
+	return "The Google API returned an error. This can sometimes happen if the document has DLP policies or other strict restrictions."
 }
 
 func init() {

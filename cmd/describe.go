@@ -1,4 +1,3 @@
-
 // Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,11 +29,11 @@ var describeCmd = &cobra.Command{
 	Short:   "Shows detailed metadata for a specific file.",
 	Long:    `Retrieves and displays all available metadata for a given file ID from the Google Drive API. The output is formatted as a JSON object.`,
 	Example: `  drivectl describe <file-id>`,
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fileId := args[0]
+	Args:    cobra.ExactArgs(1),
+	RunE: func(_ *cobra.Command, args []string) error {
+		fileID := args[0]
 
-		file, err := drive.DescribeFile(driveSvc, fileId)
+		file, err := drive.DescribeFile(driveSvc, fileID)
 		if err != nil {
 			return ui.ErrorWithHint(err, "Ensure the file ID is correct and you have permission to access it.")
 		}

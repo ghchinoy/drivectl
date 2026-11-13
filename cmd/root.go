@@ -1,3 +1,18 @@
+// Copyright 2025 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package cmd implements the Cobra CLI commands for drivectl.
 package cmd
 
 import (
@@ -14,6 +29,14 @@ import (
 	googledrive "google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
+)
+
+// Command group identifiers.
+const (
+	GroupAuth        = "auth"
+	GroupCore        = "core"
+	GroupIntegration = "integration"
+	GroupAdvanced    = "advanced"
 )
 
 var (
@@ -33,33 +56,26 @@ var (
 	sheetsSvc *sheets.Service
 )
 
-// Command Groups
-const (
-	GroupAuth        = "auth"
-	GroupCore        = "core"
-	GroupIntegration = "integration"
-	GroupAdvanced    = "advanced"
-)
-
-// rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:     "drivectl",
 	Version: Version,
 	Short:   "A CLI for Google Drive and Docs.",
 	Long: `drivectl is a powerful command-line tool for interacting with your Google Drive files.
 It allows you to list, describe, and download files, with advanced support for
-Google Docs, including exporting to multiple formats and accessing individual tabs.`, 
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+Google Docs, including exporting to multiple formats and accessing individual tabs.`,
+	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 		if cmd.Name() == "login" || cmd.Name() == "auth" || cmd.Name() == "help" {
 			return nil
 		}
-		secretFile := viper.GetString("secret-file")
-
-		ctx := context.Background()
+		ctx := cmd.Context()
 		var err error
-		client, err = drive.NewOAuthClient(ctx, secretFile, noBrowserAuth)
-		if err != nil {
-			return ui.ErrorWithHint(fmt.Errorf("could not create oauth client: %w", err), "run 'drivectl auth login' to authenticate")
+		if client == nil {
+			secretFile := viper.GetString("secret-file")
+			client, err = drive.NewOAuthClient(ctx, secretFile, noBrowserAuth)
+			if err != nil {
+				wrapped := fmt.Errorf("could not create oauth client: %w", err)
+				return ui.ErrorWithHint(wrapped, "run 'drivectl auth login' to authenticate")
+			}
 		}
 
 		driveSvc, err = googledrive.NewService(ctx, option.WithHTTPClient(client))
@@ -81,12 +97,16 @@ Google Docs, including exporting to multiple formats and accessing individual ta
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+// ExecuteContext executes the root command with the provided context.
+func ExecuteContext(ctx context.Context) error {
+	return rootCmd.ExecuteContext(ctx)
 }
 
 // ExecuteError executes the root command and returns any errors to the caller.
@@ -112,7 +132,6 @@ func init() {
 	_ = viper.BindPFlag("mcp-http", rootCmd.PersistentFlags().Lookup("mcp-http"))
 }
 
-// initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	viper.AutomaticEnv()
 }

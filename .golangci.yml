@@ -1,0 +1,40 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - cyclop
+    - errcheck
+    - gocognit
+    - gocyclo
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*net/http.Response).Body.Close
+        - (*os.File).Close
+        - (io.Closer).Close
+        - (*text/tabwriter.Writer).Flush
+        - os.Remove
+        - os.RemoveAll
+        - os.Setenv
+        - os.Unsetenv
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+  exclusions:
+    presets:
+      - std-error-handling
+      - common-false-positives
+    rules:
+      - path: _test\.go
+        linters:
+          - cyclop
+          - errcheck
+          - gocognit
+          - gocyclo

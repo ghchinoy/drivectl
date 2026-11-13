@@ -1,3 +1,17 @@
+// Copyright 2025 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cmd
 
 import (
@@ -20,7 +34,7 @@ Optionally, specify a parent folder ID to upload the file to a specific folder.`
 	Example: `  drivectl upload path/to/my/file.txt
   drivectl upload path/to/my/file.txt --parent <folder-id>`,
 	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		filePath := args[0]
 
 		res, err := drive.UploadFile(driveSvc, filePath, parentID)
@@ -29,12 +43,15 @@ Optionally, specify a parent folder ID to upload the file to a specific folder.`
 		}
 
 		if OutputFormat == "json" {
-			b, _ := json.MarshalIndent(res, "", "  ")
+			b, err := json.MarshalIndent(res, "", "  ")
+			if err != nil {
+				return err
+			}
 			fmt.Println(string(b))
-		} else {
-			ui.PrintSuccess("Successfully uploaded file: %s (ID: %s)", res.Name, res.Id)
+			return nil
 		}
 
+		ui.PrintSuccess("Successfully uploaded file: %s (ID: %s)", res.Name, res.Id)
 		return nil
 	},
 }

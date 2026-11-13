@@ -1,3 +1,17 @@
+// Copyright 2025 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cmd
 
 import (
@@ -27,22 +41,23 @@ var runCmd = &cobra.Command{
 		file := args[0]
 		b, err := os.ReadFile(file)
 		if err != nil {
-			return ui.ErrorWithHint(fmt.Errorf("failed to read recipe: %w", err), "Ensure the recipe file exists and you have read permissions.")
+			wrapped := fmt.Errorf("failed to read recipe: %w", err)
+			return ui.ErrorWithHint(wrapped, "Ensure the recipe file exists and you have read permissions.")
 		}
 
 		var recipe Recipe
 		if err := json.Unmarshal(b, &recipe); err != nil {
-			return ui.ErrorWithHint(fmt.Errorf("invalid recipe format: %w", err), "Ensure the file is valid JSON matching the Recipe schema.")
+			wrapped := fmt.Errorf("invalid recipe format: %w", err)
+			return ui.ErrorWithHint(wrapped, "Ensure the file is valid JSON matching the Recipe schema.")
 		}
 
 		ui.PrintSuccess("Starting recipe: %s (%s)", recipe.Name, recipe.Description)
-		
+
 		for i, stepArgs := range recipe.Steps {
 			fmt.Printf("\n%s Step %d: %v\n", ui.Accent("=>"), i+1, stepArgs)
-			
-			// Dynamically set args and execute the root command for this step
+
 			rootCmd.SetArgs(stepArgs)
-			if err := rootCmd.Execute(); err != nil {
+			if err := rootCmd.ExecuteContext(cmd.Context()); err != nil {
 				return fmt.Errorf("recipe failed at step %d: %w", i+1, err)
 			}
 		}

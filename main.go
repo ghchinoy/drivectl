@@ -1,4 +1,3 @@
-
 // Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,43 +12,51 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Drivectl is a command-line interface and MCP server for Google Drive, Docs, and Sheets.
 package main
 
 import (
+	"context"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/ghchinoy/drivectl/cmd"
 	"github.com/ghchinoy/drivectl/internal/ui"
 )
 
-// main is the entry point of the application.
-// It checks for the --mcp and --mcp-http flags to determine whether to run in MCP mode.
 func main() {
-	mcp := false
-	mcpHTTP := ""
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 
-	for i, arg := range os.Args[1:] {
+	err := run(ctx, os.Args[1:])
+	ui.HandleError(err)
+}
+
+func run(ctx context.Context, args []string) error {
+	mcpMode, mcpHTTP := parseMCPFlags(args)
+	if mcpMode || mcpHTTP != "" {
+		return cmd.ExecuteMCP(ctx, mcpHTTP)
+	}
+	return cmd.ExecuteContext(ctx)
+}
+
+func parseMCPFlags(args []string) (bool, string) {
+	for i, arg := range args {
 		if arg == "--mcp" {
-			mcp = true
-			break
+			return true, ""
 		}
 		if strings.HasPrefix(arg, "--mcp-http") {
 			parts := strings.SplitN(arg, "=", 2)
 			if len(parts) == 2 {
-				mcpHTTP = parts[1]
-			} else if i+1 < len(os.Args[1:]) {
-				mcpHTTP = os.Args[i+2]
+				return false, parts[1]
 			}
-			break
+			if i+1 < len(args) {
+				return false, args[i+1]
+			}
+			return false, ""
 		}
 	}
-
-	var err error
-	if mcp || mcpHTTP != "" {
-		err = cmd.ExecuteMCP(mcpHTTP)
-	} else {
-		err = cmd.ExecuteError()
-	}
-	ui.HandleError(err)
+	return false, ""
 }

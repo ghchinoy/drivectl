@@ -27,7 +27,7 @@ import (
 var (
 	outputFile string
 	format     string
-	tabId      string
+	tabID      string
 )
 
 var getCmd = &cobra.Command{
@@ -41,22 +41,21 @@ It can also extract the plain text content of a single tab from a Google Doc usi
 	Example: `  drivectl get <file-id>
   drivectl get <google-doc-id> --format md -o my-doc.md
   drivectl get <google-doc-id> --tab-id <tab-id>`,
-	Args:  cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fileId := args[0]
+	Args: cobra.ExactArgs(1),
+	RunE: func(_ *cobra.Command, args []string) error {
+		fileID := args[0]
 
-		content, err := drive.GetFile(driveSvc, docsSvc, fileId, format, tabId)
+		content, err := drive.FetchFile(driveSvc, docsSvc, fileID, format, tabID)
 		if err != nil {
 			return err
 		}
 
 		if OutputFormat == "json" {
-			// json import added at top
-			res := map[string]interface{}{
-				"fileId": fileId,
+			res := map[string]any{
+				"fileId":  fileID,
 				"content": string(content),
-				"format": format,
-				"tabId": tabId,
+				"format":  format,
+				"tabId":   tabID,
 			}
 			b, err := json.MarshalIndent(res, "", "  ")
 			if err != nil {
@@ -67,21 +66,20 @@ It can also extract the plain text content of a single tab from a Google Doc usi
 		}
 
 		if outputFile != "" {
-			err := os.WriteFile(outputFile, content, 0644)
-			if err != nil {
-				return ui.ErrorWithHint(fmt.Errorf("failed to write to output file %s: %w", outputFile, err), "Check file permissions and path.")
+			if err := os.WriteFile(outputFile, content, 0o600); err != nil {
+				wrapped := fmt.Errorf("failed to write to output file %q: %w", outputFile, err)
+				return ui.ErrorWithHint(wrapped, "Check file permissions and path.")
 			}
 			ui.PrintSuccess("Saved file to %s", outputFile)
-		} else {
-			// For binary formats like pdf, docx, etc., printing to console is not useful.
-			// We will just print a success message instead.
-			if format != "" && format != "txt" && format != "html" && format != "md" {
-				ui.PrintSuccess("Downloaded file content. Use the -o flag to save it to a file.")
-			} else {
-				fmt.Println(string(content))
-			}
+			return nil
 		}
 
+		if format != "" && format != "txt" && format != "html" && format != "md" {
+			ui.PrintSuccess("Downloaded file content. Use the -o flag to save it to a file.")
+			return nil
+		}
+
+		fmt.Println(string(content))
 		return nil
 	},
 }
@@ -90,5 +88,5 @@ func init() {
 	rootCmd.AddCommand(getCmd)
 	getCmd.Flags().StringVarP(&outputFile, "output", "o", "", "Path to save the output file")
 	getCmd.Flags().StringVar(&format, "format", "", "Export format for Google Docs (e.g., pdf, docx, html, txt, md)")
-	getCmd.Flags().StringVar(&tabId, "tab-id", "", "ID of the tab to get content from")
+	getCmd.Flags().StringVar(&tabID, "tab-id", "", "ID of the tab to get content from")
 }

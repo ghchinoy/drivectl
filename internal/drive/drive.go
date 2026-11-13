@@ -1,3 +1,17 @@
+// Copyright 2025 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package drive
 
 import (
@@ -11,14 +25,13 @@ import (
 	"google.golang.org/api/drive/v3"
 )
 
-// ListFiles lists the files and folders in Google Drive.
-func ListFiles(srv *drive.Service, limit int64, query string) ([]*drive.File, error) {
-	r, err := srv.Files.List().PageSize(limit).Q(query).
-		Fields("nextPageToken, files(id, name)").Do()
-	if err != nil {
-		return nil, err
-	}
-	return r.Files, nil
+// TabInfo contains information about a tab in a Google Doc.
+type TabInfo struct {
+	Title    string
+	TabID    string
+	Level    int
+	Children []*TabInfo
+	Markdown string
 }
 
 var formatMap = map[string]string{
@@ -38,172 +51,46 @@ var formatMap = map[string]string{
 	"odp":      "application/vnd.oasis.opendocument.presentation",
 }
 
-// renderBodyAsText converts a Google Docs Body object to a Markdown string.
-func renderBodyAsText(body *docs.Body) string {
-	var text strings.Builder
-	if body == nil || body.Content == nil {
-		return ""
+// ListFiles lists the files and folders in Google Drive.
+func ListFiles(srv *drive.Service, limit int64, query string) ([]*drive.File, error) {
+	r, err := srv.Files.List().PageSize(limit).Q(query).
+		Fields("nextPageToken, files(id, name)").Do()
+	if err != nil {
+		return nil, err
 	}
-	for _, element := range body.Content {
-		if element.Paragraph != nil {
-			// Check if it's a heading
-			if element.Paragraph.ParagraphStyle != nil {
-				style := element.Paragraph.ParagraphStyle.NamedStyleType
-				if strings.HasPrefix(style, "HEADING_") {
-					level := strings.TrimPrefix(style, "HEADING_")
-					switch level {
-					case "1": text.WriteString("# ")
-					case "2": text.WriteString("## ")
-					case "3": text.WriteString("### ")
-					case "4": text.WriteString("#### ")
-					case "5": text.WriteString("##### ")
-					case "6": text.WriteString("###### ")
-					}
-				}
-			}
-
-			// Check if it's a list item
-			if element.Paragraph.Bullet != nil {
-				// Simple heuristic for unordered vs ordered isn't easily exposed without looking at the list properties,
-				// but we can default to unordered bullet points for now.
-				nesting := element.Paragraph.Bullet.NestingLevel
-				indent := strings.Repeat("  ", int(nesting))
-				text.WriteString(indent + "* ")
-			}
-
-			for _, pElem := range element.Paragraph.Elements {
-				if pElem.TextRun != nil {
-					content := pElem.TextRun.Content
-					
-					// Apply formatting if present
-					if pElem.TextRun.TextStyle != nil {
-						style := pElem.TextRun.TextStyle
-						if style.Bold {
-							content = "**" + strings.TrimSpace(content) + "** "
-						} else if style.Italic {
-							content = "*" + strings.TrimSpace(content) + "* "
-						}
-						
-						if style.Link != nil && style.Link.Url != "" {
-							content = fmt.Sprintf("[%s](%s) ", strings.TrimSpace(content), style.Link.Url)
-						}
-					}
-					text.WriteString(content)
-				}
-			}
-		}
-	}
-	return text.String()
+	return r.Files, nil
 }
 
-func findTab(tabs []*docs.Tab, tabId string) *docs.Tab {
-	for _, t := range tabs {
-		if t.TabProperties != nil && t.TabProperties.TabId == tabId {
-			return t
-		}
-		if len(t.ChildTabs) > 0 {
-			if found := findTab(t.ChildTabs, tabId); found != nil {
-				return found
-			}
-		}
-	}
-	return nil
-}
-
-func getDocumentTabContent(docsSvc *docs.Service, fileId string, tabId string) ([]byte, error) {
-	doc, err := docsSvc.Documents.Get(fileId).IncludeTabsContent(true).Do()
-	if err != nil {
-		return nil, fmt.Errorf("unable to retrieve document with tabs: %w", err)
+// FetchFile downloads a file or exports a Google Doc.
+func FetchFile(driveSvc *drive.Service, docsSvc *docs.Service, fileID, format, tabID string) ([]byte, error) {
+	if tabID != "" {
+		return getDocumentTabContent(docsSvc, fileID, tabID)
 	}
 
-	if tab := findTab(doc.Tabs, tabId); tab != nil {
-		textContent := renderBodyAsText(tab.DocumentTab.Body)
-		return []byte(textContent), nil
-	}
-
-	return nil, fmt.Errorf("tab with id %s not found", tabId)
-}
-
-func exportGoogleAppsFile(driveSvc *drive.Service, fileId string, mimeType string, format string) ([]byte, error) {
-	exportMimeType, ok := formatMap[strings.ToLower(format)]
-	if !ok && format != "" {
-		return nil, fmt.Errorf("invalid format: %s. Valid formats are: pdf, docx, html, zip, epub, txt, md, csv, tsv, xlsx, ods, pptx, odp", format)
-	}
-
-	if mimeType == "application/vnd.google-apps.spreadsheet" {
-		if format == "" || format == "txt" {
-			exportMimeType = "text/csv"
-		}
-	} else if format == "" {
-		exportMimeType = "text/plain"
-	}
-
-	resp, err := driveSvc.Files.Export(fileId, exportMimeType).Download()
-	if err != nil {
-		return nil, fmt.Errorf("unable to export Google Doc: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read exported content: %w", err)
-	}
-	return body, nil
-}
-
-func downloadStandardFile(driveSvc *drive.Service, fileId string) ([]byte, error) {
-	resp, err := driveSvc.Files.Get(fileId).Download()
-	if err != nil {
-		return nil, fmt.Errorf("unable to download file: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read file content: %w", err)
-	}
-	return body, nil
-}
-
-// GetFile downloads a file or exports a Google Doc.
-func GetFile(driveSvc *drive.Service, docsSvc *docs.Service, fileId string, format string, tabId string) ([]byte, error) {
-	if tabId != "" {
-		return getDocumentTabContent(docsSvc, fileId, tabId)
-	}
-
-	file, err := driveSvc.Files.Get(fileId).Fields("mimeType", "name").Do()
+	file, err := driveSvc.Files.Get(fileID).Fields("mimeType", "name").Do()
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve file metadata: %w", err)
 	}
 
 	if strings.HasPrefix(file.MimeType, "application/vnd.google-apps") {
-		return exportGoogleAppsFile(driveSvc, fileId, file.MimeType, format)
+		return exportGoogleAppsFile(driveSvc, fileID, file.MimeType, format)
 	}
 
-	return downloadStandardFile(driveSvc, fileId)
+	return downloadStandardFile(driveSvc, fileID)
 }
 
-// DescribeFile shows detailed metadata for a specific file.
-func DescribeFile(driveSvc *drive.Service, fileId string) (*drive.File, error) {
-	file, err := driveSvc.Files.Get(fileId).Fields("*").Do()
+// DescribeFile retrieves detailed metadata for a specific file.
+func DescribeFile(driveSvc *drive.Service, fileID string) (*drive.File, error) {
+	file, err := driveSvc.Files.Get(fileID).Fields("*").Do()
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve file: %w", err)
 	}
 	return file, nil
 }
 
-// TabInfo contains information about a tab in a Google Doc.
-type TabInfo struct {
-	Title    string
-	TabID    string
-	Level    int
-	Children []*TabInfo
-	Markdown string
-}
-
-// GetTabs lists the tabs within a Google Doc.
-func GetTabs(docsSvc *docs.Service, documentId string) ([]*TabInfo, error) {
-	doc, err := docsSvc.Documents.Get(documentId).IncludeTabsContent(true).Do()
+// FetchTabs lists the tabs within a Google Doc.
+func FetchTabs(docsSvc *docs.Service, documentID string) ([]*TabInfo, error) {
+	doc, err := docsSvc.Documents.Get(documentID).IncludeTabsContent(true).Do()
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve document with tabs: %w", err)
 	}
@@ -231,7 +118,7 @@ func GetTabs(docsSvc *docs.Service, documentId string) ([]*TabInfo, error) {
 }
 
 // CreateDocFromMarkdown creates a new Google Doc from a Markdown string.
-func CreateDocFromMarkdown(docsSvc *docs.Service, title string, markdownContent string) (*docs.Document, error) {
+func CreateDocFromMarkdown(docsSvc *docs.Service, title, markdownContent string) (*docs.Document, error) {
 	requests, err := MarkdownToDocsRequests(markdownContent)
 	if err != nil {
 		return nil, fmt.Errorf("unable to convert markdown to requests: %w", err)
@@ -258,14 +145,12 @@ func CreateDocFromMarkdown(docsSvc *docs.Service, title string, markdownContent 
 }
 
 // UploadFile uploads a local file to Google Drive.
-func UploadFile(srv *drive.Service, filePath string, parentID string) (*drive.File, error) {
+func UploadFile(srv *drive.Service, filePath, parentID string) (*drive.File, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to open file %s: %w", filePath, err)
+		return nil, fmt.Errorf("unable to open file %q: %w", filePath, err)
 	}
-	defer func() {
-		_ = file.Close()
-	}()
+	defer file.Close()
 
 	fileName := filepath.Base(filePath)
 	f := &drive.File{
@@ -277,7 +162,153 @@ func UploadFile(srv *drive.Service, filePath string, parentID string) (*drive.Fi
 
 	res, err := srv.Files.Create(f).Media(file).Do()
 	if err != nil {
-		return nil, fmt.Errorf("unable to create file %s: %w", fileName, err)
+		return nil, fmt.Errorf("unable to create file %q: %w", fileName, err)
 	}
 	return res, nil
+}
+
+// renderBodyAsText converts a Google Docs Body object to a Markdown string.
+func renderBodyAsText(body *docs.Body) string {
+	if body == nil || len(body.Content) == 0 {
+		return ""
+	}
+	var text strings.Builder
+	for _, element := range body.Content {
+		if element != nil && element.Paragraph != nil {
+			renderParagraphAsMarkdown(&text, element.Paragraph)
+		}
+	}
+	return text.String()
+}
+
+func renderParagraphAsMarkdown(text *strings.Builder, p *docs.Paragraph) {
+	text.WriteString(headingPrefix(p.ParagraphStyle))
+	text.WriteString(bulletPrefix(p.Bullet))
+	for _, elem := range p.Elements {
+		if elem != nil && elem.TextRun != nil {
+			text.WriteString(renderTextRun(elem.TextRun))
+		}
+	}
+}
+
+func headingPrefix(style *docs.ParagraphStyle) string {
+	if style == nil {
+		return ""
+	}
+	switch style.NamedStyleType {
+	case "HEADING_1":
+		return "# "
+	case "HEADING_2":
+		return "## "
+	case "HEADING_3":
+		return "### "
+	case "HEADING_4":
+		return "#### "
+	case "HEADING_5":
+		return "##### "
+	case "HEADING_6":
+		return "###### "
+	default:
+		return ""
+	}
+}
+
+func bulletPrefix(bullet *docs.Bullet) string {
+	if bullet == nil {
+		return ""
+	}
+	return strings.Repeat("  ", int(bullet.NestingLevel)) + "* "
+}
+
+func renderTextRun(tr *docs.TextRun) string {
+	content := tr.Content
+	style := tr.TextStyle
+	if style == nil {
+		return content
+	}
+	switch {
+	case style.Bold:
+		content = "**" + strings.TrimSpace(content) + "** "
+	case style.Italic:
+		content = "*" + strings.TrimSpace(content) + "* "
+	}
+	if style.Link != nil && style.Link.Url != "" {
+		content = fmt.Sprintf("[%s](%s) ", strings.TrimSpace(content), style.Link.Url)
+	}
+	return content
+}
+
+func findTab(tabs []*docs.Tab, tabID string) *docs.Tab {
+	for _, t := range tabs {
+		if t.TabProperties != nil && t.TabProperties.TabId == tabID {
+			return t
+		}
+		if len(t.ChildTabs) > 0 {
+			if found := findTab(t.ChildTabs, tabID); found != nil {
+				return found
+			}
+		}
+	}
+	return nil
+}
+
+func getDocumentTabContent(docsSvc *docs.Service, fileID, tabID string) ([]byte, error) {
+	doc, err := docsSvc.Documents.Get(fileID).IncludeTabsContent(true).Do()
+	if err != nil {
+		return nil, fmt.Errorf("unable to retrieve document with tabs: %w", err)
+	}
+
+	if tab := findTab(doc.Tabs, tabID); tab != nil && tab.DocumentTab != nil {
+		textContent := renderBodyAsText(tab.DocumentTab.Body)
+		return []byte(textContent), nil
+	}
+
+	return nil, fmt.Errorf("tab with id %q not found", tabID)
+}
+
+func exportGoogleAppsFile(driveSvc *drive.Service, fileID, mimeType, format string) ([]byte, error) {
+	exportMimeType, err := resolveExportMimeType(mimeType, format)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := driveSvc.Files.Export(fileID, exportMimeType).Download()
+	if err != nil {
+		return nil, fmt.Errorf("unable to export Google Doc: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read exported content: %w", err)
+	}
+	return body, nil
+}
+
+func resolveExportMimeType(mimeType, format string) (string, error) {
+	exportMimeType, ok := formatMap[strings.ToLower(format)]
+	if !ok && format != "" {
+		return "", fmt.Errorf("invalid format %q (valid formats: pdf, docx, html, zip, epub, txt, md, csv, tsv, xlsx, ods, pptx, odp)", format)
+	}
+	if mimeType == "application/vnd.google-apps.spreadsheet" && (format == "" || format == "txt") {
+		return "text/csv", nil
+	}
+	if format == "" {
+		return "text/plain", nil
+	}
+	return exportMimeType, nil
+}
+
+func downloadStandardFile(driveSvc *drive.Service, fileID string) ([]byte, error) {
+	resp, err := driveSvc.Files.Get(fileID).Download()
+	if err != nil {
+		return nil, fmt.Errorf("unable to download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read file content: %w", err)
+	}
+	return body, nil
 }

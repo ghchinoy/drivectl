@@ -1,3 +1,17 @@
+// Copyright 2025 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cmd
 
 import (
@@ -31,9 +45,9 @@ var sheetsListCmd = &cobra.Command{
 	Long:    `Lists all the individual sheets (tabs) within a given spreadsheet.`,
 	Example: `  drivectl sheets list <spreadsheet-id>`,
 	Args:    cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		spreadsheetId := args[0]
-		sheets, err := drive.ListSheets(sheetsSvc, spreadsheetId)
+	RunE: func(_ *cobra.Command, args []string) error {
+		spreadsheetID := args[0]
+		sheets, err := drive.ListSheets(sheetsSvc, spreadsheetID)
 		if err != nil {
 			return ui.ErrorWithHint(err, "Ensure the spreadsheet ID is correct.")
 		}
@@ -61,18 +75,18 @@ var sheetsGetCmd = &cobra.Command{
 	Long:    `Retrieves the entire content of a specified sheet and outputs it as CSV. An optional output file can be specified.`,
 	Example: `  drivectl sheets get <spreadsheet-id> --sheet Sheet1`,
 	Args:    cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		spreadsheetId := args[0]
-		csv, err := drive.GetSheetAsCSV(sheetsSvc, spreadsheetId, sheetName)
+	RunE: func(_ *cobra.Command, args []string) error {
+		spreadsheetID := args[0]
+		csv, err := drive.FetchSheetAsCSV(sheetsSvc, spreadsheetID, sheetName)
 		if err != nil {
 			return ui.ErrorWithHint(err, "Check if the sheet name exists in the given spreadsheet ID.")
 		}
 
 		if OutputFormat == "json" {
-			res := map[string]interface{}{
-				"spreadsheetId": spreadsheetId,
-				"sheetName": sheetName,
-				"csv": csv,
+			res := map[string]any{
+				"spreadsheetId": spreadsheetID,
+				"sheetName":     sheetName,
+				"csv":           csv,
 			}
 			b, err := json.MarshalIndent(res, "", "  ")
 			if err != nil {
@@ -83,14 +97,15 @@ var sheetsGetCmd = &cobra.Command{
 		}
 
 		if sheetsOutputFile != "" {
-			err := os.WriteFile(sheetsOutputFile, []byte(csv), 0644)
-			if err != nil {
-				return ui.ErrorWithHint(fmt.Errorf("failed to write to output file %s: %w", sheetsOutputFile, err), "Check file path permissions.")
+			if err := os.WriteFile(sheetsOutputFile, []byte(csv), 0o600); err != nil {
+				wrapped := fmt.Errorf("failed to write to output file %q: %w", sheetsOutputFile, err)
+				return ui.ErrorWithHint(wrapped, "Check file path permissions.")
 			}
 			ui.PrintSuccess("Saved sheet to %s", sheetsOutputFile)
-		} else {
-			fmt.Println(csv)
+			return nil
 		}
+
+		fmt.Println(csv)
 		return nil
 	},
 }
@@ -101,9 +116,9 @@ var sheetsGetRangeCmd = &cobra.Command{
 	Long:    `Retrieves a specific range of cells from a sheet, specified using A1 notation.`,
 	Example: `  drivectl sheets get-range <spreadsheet-id> --sheet Sheet1 --range A1:C10`,
 	Args:    cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		spreadsheetId := args[0]
-		values, err := drive.GetSheetRange(sheetsSvc, spreadsheetId, sheetName, sheetRange)
+	RunE: func(_ *cobra.Command, args []string) error {
+		spreadsheetID := args[0]
+		values, err := drive.FetchSheetRange(sheetsSvc, spreadsheetID, sheetName, sheetRange)
 		if err != nil {
 			return ui.ErrorWithHint(err, "Verify the A1 notation of the range (e.g. A1:B2).")
 		}
@@ -118,12 +133,11 @@ var sheetsGetRangeCmd = &cobra.Command{
 		}
 
 		w := new(tabwriter.Writer)
-		// Format in tab-separated columns with a tab stop of 8.
 		w.Init(os.Stdout, 0, 8, 0, '\t', 0)
 		for _, row := range values {
 			var rowStr []string
 			for _, cell := range row {
-				rowStr = append(rowStr, fmt.Sprintf("%v", cell))
+				rowStr = append(rowStr, fmt.Sprint(cell))
 			}
 			fmt.Fprintln(w, strings.Join(rowStr, "\t"))
 		}
@@ -139,22 +153,22 @@ var sheetsUpdateRangeCmd = &cobra.Command{
 	Long:    `Updates a specific cell or range of cells within a sheet, specified using A1 notation.`,
 	Example: `  drivectl sheets update-range <spreadsheet-id> "Done" --sheet Sheet1 --range B2`,
 	Args:    cobra.ExactArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		spreadsheetId := args[0]
+	RunE: func(_ *cobra.Command, args []string) error {
+		spreadsheetID := args[0]
 		value := args[1]
-		values := [][]interface{}{{value}}
-		err := drive.UpdateSheetRange(sheetsSvc, spreadsheetId, sheetName, sheetRange, values)
+		values := [][]any{{value}}
+		err := drive.UpdateSheetRange(sheetsSvc, spreadsheetID, sheetName, sheetRange, values)
 		if err != nil {
 			return ui.ErrorWithHint(err, "Verify the A1 notation of the range and that you have write permissions.")
 		}
 
 		if OutputFormat == "json" {
-			res := map[string]interface{}{
-				"status": "success",
-				"spreadsheetId": spreadsheetId,
-				"sheetName": sheetName,
-				"range": sheetRange,
-				"updatedValue": value,
+			res := map[string]any{
+				"status":        "success",
+				"spreadsheetId": spreadsheetID,
+				"sheetName":     sheetName,
+				"range":         sheetRange,
+				"updatedValue":  value,
 			}
 			b, err := json.MarshalIndent(res, "", "  ")
 			if err != nil {

@@ -1,12 +1,26 @@
+// Copyright 2025 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package cmd
 
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/ghchinoy/drivectl/internal/discovery"
@@ -14,9 +28,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	payloadData string
-)
+var payloadData string
 
 var callCmd = &cobra.Command{
 	Use:     "call [service.resource.method]",
@@ -34,7 +46,10 @@ Example:
 		path := args[0]
 		parts := strings.Split(path, ".")
 		if len(parts) < 4 {
-			return ui.ErrorWithHint(fmt.Errorf("invalid path format"), "Path must be in the format 'service.version.resource.method' (e.g. drive.v3.files.list)")
+			return ui.ErrorWithHint(
+				errors.New("invalid path format"),
+				"Path must be in the format 'service.version.resource.method' (e.g. drive.v3.files.list)",
+			)
 		}
 
 		serviceName := parts[0]
@@ -42,132 +57,59 @@ Example:
 		methodName := parts[len(parts)-1]
 		resourcePath := parts[2 : len(parts)-1]
 
-		doc, err := discovery.FetchDiscoveryDocument(client, serviceName, version)
+		ctx := cmd.Context()
+		doc, err := discovery.FetchDiscoveryDocument(ctx, client, serviceName, version)
 		if err != nil {
-			return ui.ErrorWithHint(fmt.Errorf("failed to fetch discovery document: %w", err), "Ensure your network is active and the API service/version exist.")
+			wrapped := fmt.Errorf("failed to fetch discovery document: %w", err)
+			return ui.ErrorWithHint(wrapped, "Ensure your network is active and the API service/version exist.")
 		}
 
-		method, err := findMethod(doc, resourcePath, methodName)
+		method, err := discovery.FindMethod(doc, resourcePath, methodName)
 		if err != nil {
 			return ui.ErrorWithHint(err, "Double check the resource and method names against the Google API documentation.")
 		}
 
-		// Prepare the URL
-		// Simple replacement for path parameters (very naive for now)
-		apiURL := doc.BaseURL + method.Path
-		// If BaseURL is missing, fallback to rootUrl + servicePath
-		if doc.BaseURL == "" {
-			apiURL = doc.RootURL + doc.ServicePath + method.Path
-		}
-		
-		var reqBody io.Reader
+		var parsed map[string]any
 		if payloadData != "" {
-			var parsed map[string]interface{}
 			if err := json.Unmarshal([]byte(payloadData), &parsed); err != nil {
 				return fmt.Errorf("invalid JSON payload: %w", err)
 			}
-			
-			// If method requires path parameters, extract them from payload and remove from body
-			for paramName, paramDef := range method.Parameters {
-				if paramDef.Location == "path" {
-					if val, ok := parsed[paramName]; ok {
-						valStr := fmt.Sprintf("%v", val)
-						apiURL = strings.Replace(apiURL, "{"+paramName+"}", url.PathEscape(valStr), -1)
-						delete(parsed, paramName)
-					} else if paramDef.Required {
-						return fmt.Errorf("missing required path parameter: %s", paramName)
-					}
-				}
-			}
-
-			// Add remaining payload as query parameters if no request body is expected
-			if method.Request == nil {
-				u, err := url.Parse(apiURL)
-				if err == nil {
-					q := u.Query()
-					for k, v := range parsed {
-						q.Set(k, fmt.Sprintf("%v", v))
-					}
-					u.RawQuery = q.Encode()
-					apiURL = u.String()
-				}
-			} else {
-				// We have a request body schema
-				jsonBytes, _ := json.Marshal(parsed)
-				reqBody = bytes.NewReader(jsonBytes)
-			}
-		} else {
-			// Check if any path parameters are strictly required but missing
-			for paramName, paramDef := range method.Parameters {
-				if paramDef.Location == "path" && paramDef.Required {
-					return fmt.Errorf("missing required path parameter: %s (provide via --payload)", paramName)
-				}
-			}
 		}
 
-		req, err := http.NewRequest(method.HTTPMethod, apiURL, reqBody)
+		req, err := discovery.BuildRequest(ctx, doc, method, parsed, false)
 		if err != nil {
-			return fmt.Errorf("failed to create request: %w", err)
-		}
-
-		if reqBody != nil {
-			req.Header.Set("Content-Type", "application/json")
+			return err
 		}
 
 		resp, err := client.Do(req)
 		if err != nil {
-			return ui.ErrorWithHint(fmt.Errorf("API request failed: %w", err), "Check your network connection and payload formatting.")
+			wrapped := fmt.Errorf("executing API request: %w", err)
+			return ui.ErrorWithHint(wrapped, "Check your network connection and payload formatting.")
 		}
 		defer resp.Body.Close()
 
 		respBody, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return ui.ErrorWithHint(fmt.Errorf("failed to read response: %w", err), "The server returned an unreadable response.")
+			wrapped := fmt.Errorf("failed to read response: %w", err)
+			return ui.ErrorWithHint(wrapped, "The server returned an unreadable response.")
 		}
 
-		if resp.StatusCode >= 400 {
-			return ui.ErrorWithHint(fmt.Errorf("API error (HTTP %d): %s", resp.StatusCode, string(respBody)), "Read the Google API error message above to correct your request.")
+		if resp.StatusCode >= http.StatusBadRequest {
+			wrapped := fmt.Errorf("unexpected HTTP %d from API: %s", resp.StatusCode, string(respBody))
+			return ui.ErrorWithHint(wrapped, "Read the Google API error message above to correct your request.")
 		}
 
-		// Pretty print JSON response
-		var prettyJSON bytes.Buffer
-		if err := json.Indent(&prettyJSON, respBody, "", "  "); err != nil {
-			// Not JSON, just print raw
-			fmt.Println(string(respBody))
-		} else {
-			fmt.Println(prettyJSON.String())
-		}
-
+		fmt.Println(prettyFormatResponse(respBody))
 		return nil
 	},
 }
 
-func findMethod(doc *discovery.RestDescription, resourcePath []string, methodName string) (*discovery.RestMethod, error) {
-	if len(resourcePath) == 0 {
-		return nil, fmt.Errorf("resource path cannot be empty")
+func prettyFormatResponse(respBody []byte) string {
+	var prettyJSON bytes.Buffer
+	if err := json.Indent(&prettyJSON, respBody, "", "  "); err != nil {
+		return string(respBody)
 	}
-
-	firstResourceName := resourcePath[0]
-	resource, ok := doc.Resources[firstResourceName]
-	if !ok {
-		return nil, fmt.Errorf("resource '%s' not found", firstResourceName)
-	}
-
-	currentResource := resource
-	for _, subName := range resourcePath[1:] {
-		subResource, ok := currentResource.Resources[subName]
-		if !ok {
-			return nil, fmt.Errorf("sub-resource '%s' not found", subName)
-		}
-		currentResource = subResource
-	}
-
-	method, ok := currentResource.Methods[methodName]
-	if !ok {
-		return nil, fmt.Errorf("method '%s' not found", methodName)
-	}
-
-	return &method, nil
+	return prettyJSON.String()
 }
 
 func init() {

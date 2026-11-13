@@ -1,8 +1,24 @@
+// Copyright 2025 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package drive provides Google Drive, Docs, and Sheets API client wrappers.
 package drive
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -23,7 +39,7 @@ func ConfigDir() (string, error) {
 		return "", fmt.Errorf("failed to get user home directory: %w", err)
 	}
 	configDir := filepath.Join(homeDir, ".config", "drivectl")
-	if err := os.MkdirAll(configDir, 0700); err != nil {
+	if err := os.MkdirAll(configDir, 0o700); err != nil {
 		return "", fmt.Errorf("failed to create config directory: %w", err)
 	}
 	return configDir, nil
@@ -41,31 +57,27 @@ func NewOAuthClient(ctx context.Context, secretFile string, noBrowserAuth bool) 
 
 	b, err := os.ReadFile(secretFile)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read client secret file at %s: %v", secretFile, err)
+		return nil, fmt.Errorf("unable to read client secret file at %q: %w", secretFile, err)
 	}
 
 	config, err := google.ConfigFromJSON(b, drive.DriveReadonlyScope, docs.DocumentsReadonlyScope, sheets.SpreadsheetsScope, drive.DriveFileScope)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse client secret file to config: %v", err)
+		return nil, fmt.Errorf("unable to parse client secret file to config: %w", err)
 	}
 
-	return GetClient(ctx, config, noBrowserAuth)
+	return FetchClient(ctx, config, noBrowserAuth)
 }
 
-// GetClient retrieves a token from a local file or the web, then returns a client.
-func GetClient(ctx context.Context, config *oauth2.Config, noBrowserAuth bool) (*http.Client, error) {
+// FetchClient retrieves a token from a local file or the web, then returns an authenticated HTTP client.
+func FetchClient(ctx context.Context, config *oauth2.Config, noBrowserAuth bool) (*http.Client, error) {
 	cacheFile, err := TokenCacheFile()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get path to cached credential file: %v", err)
+		return nil, fmt.Errorf("unable to get path to cached credential file: %w", err)
 	}
 
 	tok, err := TokenFromFile(cacheFile)
 	if err != nil {
-		if noBrowserAuth {
-			tok, err = GetTokenFromWeb(config)
-		} else {
-			tok, err = GetTokenFromWebWithBrowser(config)
-		}
+		tok, err = fetchOAuthToken(ctx, config, noBrowserAuth)
 		if err != nil {
 			return nil, err
 		}
@@ -76,8 +88,15 @@ func GetClient(ctx context.Context, config *oauth2.Config, noBrowserAuth bool) (
 	return config.Client(ctx, tok), nil
 }
 
-// GetTokenFromWebWithBrowser uses a local web server to handle the OAuth flow.
-func GetTokenFromWebWithBrowser(config *oauth2.Config) (*oauth2.Token, error) {
+func fetchOAuthToken(ctx context.Context, config *oauth2.Config, noBrowserAuth bool) (*oauth2.Token, error) {
+	if noBrowserAuth {
+		return FetchTokenFromWeb(ctx, config)
+	}
+	return FetchTokenFromWebWithBrowser(ctx, config)
+}
+
+// FetchTokenFromWebWithBrowser uses a local web server to handle the OAuth 2.0 callback flow.
+func FetchTokenFromWebWithBrowser(ctx context.Context, config *oauth2.Config) (*oauth2.Token, error) {
 	config.RedirectURL = "http://localhost:8080"
 	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 
@@ -86,47 +105,71 @@ func GetTokenFromWebWithBrowser(config *oauth2.Config) (*oauth2.Token, error) {
 		return nil, fmt.Errorf("failed to open browser: %w", err)
 	}
 
-	codeChan := make(chan string)
-	errChan := make(chan error)
+	codeChan := make(chan string, 1)
+	errChan := make(chan error, 1)
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		code := r.URL.Query().Get("code")
-		if code == "" {
-			fmt.Fprintln(w, "Invalid request. No authorization code received.")
-			errChan <- fmt.Errorf("no code in request")
-			return
-		}
-		fmt.Fprintln(w, "Authentication successful! You can close this browser window.")
-		codeChan <- code
-	})
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: newOAuthCallbackHandler(codeChan, errChan),
+	}
+	defer func() {
+		_ = srv.Shutdown(ctx)
+	}()
 
 	go func() {
-		if err := http.ListenAndServe(":8080", nil); err != http.ErrServerClosed {
-			errChan <- err
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			sendNonBlockingErr(errChan, err)
 		}
 	}()
 
 	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	case code := <-codeChan:
-		return config.Exchange(context.Background(), code)
+		return config.Exchange(ctx, code)
 	case err := <-errChan:
 		return nil, fmt.Errorf("failed to start local server or get code: %w", err)
 	}
 }
 
-// GetTokenFromWeb requests a token from the web.
-func GetTokenFromWeb(config *oauth2.Config) (*oauth2.Token, error) {
+func newOAuthCallbackHandler(codeChan chan<- string, errChan chan<- error) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+		if code == "" {
+			fmt.Fprintln(w, "Invalid request. No authorization code received.")
+			sendNonBlockingErr(errChan, errors.New("no code in request"))
+			return
+		}
+		fmt.Fprintln(w, "Authentication successful! You can close this browser window.")
+		select {
+		case codeChan <- code:
+		default:
+		}
+	})
+	return mux
+}
+
+func sendNonBlockingErr(errChan chan<- error, err error) {
+	select {
+	case errChan <- err:
+	default:
+	}
+}
+
+// FetchTokenFromWeb requests an OAuth 2.0 token from the web via manual terminal code entry.
+func FetchTokenFromWeb(ctx context.Context, config *oauth2.Config) (*oauth2.Token, error) {
 	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 	fmt.Printf("Go to the following link in your browser then type the authorization code: \n%v\n", authURL)
 
 	var authCode string
 	if _, err := fmt.Scan(&authCode); err != nil {
-		return nil, fmt.Errorf("unable to read authorization code: %v", err)
+		return nil, fmt.Errorf("unable to read authorization code: %w", err)
 	}
 
-	tok, err := config.Exchange(context.Background(), authCode)
+	tok, err := config.Exchange(ctx, authCode)
 	if err != nil {
-		return nil, fmt.Errorf("unable to retrieve token from web: %v", err)
+		return nil, fmt.Errorf("unable to retrieve token from web: %w", err)
 	}
 	return tok, nil
 }
@@ -140,7 +183,7 @@ func TokenCacheFile() (string, error) {
 	return filepath.Join(configDir, "token.json"), nil
 }
 
-// TokenFromFile retrieves a token from a file.
+// TokenFromFile retrieves a cached OAuth 2.0 token from a file.
 func TokenFromFile(file string) (*oauth2.Token, error) {
 	f, err := os.Open(file)
 	if err != nil {
@@ -152,13 +195,16 @@ func TokenFromFile(file string) (*oauth2.Token, error) {
 	return tok, err
 }
 
-// SaveToken saves a token to a file.
+// SaveToken saves an OAuth 2.0 token to a file with restricted permissions.
 func SaveToken(file string, token *oauth2.Token) error {
 	fmt.Printf("Saving credential file to: %s\n", file)
-	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
-		return fmt.Errorf("unable to cache oauth token: %v", err)
+		return fmt.Errorf("unable to cache oauth token: %w", err)
 	}
-	defer f.Close()
-	return json.NewEncoder(f).Encode(token)
+	err = json.NewEncoder(f).Encode(token)
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
+	return err
 }

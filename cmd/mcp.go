@@ -15,10 +15,12 @@
 package cmd
 
 import (
+	"context"
+
 	"github.com/ghchinoy/drivectl/mcp"
 )
 
-// ExecuteMCP starts the MCP server.
-func ExecuteMCP(httpAddr string) error {
-	return mcp.Start(rootCmd, httpAddr)
+// ExecuteMCP starts the MCP server using the provided context.
+func ExecuteMCP(ctx context.Context, httpAddr string) error {
+	return mcp.Start(ctx, rootCmd, httpAddr)
 }

@@ -31,21 +31,13 @@ var revisionsCmd = &cobra.Command{
 	Long:    `Retrieves and displays the revision history for a given file ID from the Google Drive API.`,
 	Example: `  drivectl revisions <file-id>`,
 	Args:    cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fileId := args[0]
-		revisions, err := drive.ListRevisions(driveSvc, fileId)
+	RunE: func(_ *cobra.Command, args []string) error {
+		fileID := args[0]
+		revisions, err := drive.ListRevisions(driveSvc, fileID)
 		if err != nil {
-			hint := "Check if the file ID is correct and you have permission to view revisions."
-			if strings.Contains(err.Error(), "500") || strings.Contains(err.Error(), "403") {
-				if file, describeErr := drive.DescribeFile(driveSvc, fileId); describeErr == nil {
-					if file.CopyRequiresWriterPermission {
-						hint = "This document has download/copy restrictions enabled, which can cause the Google API to reject revisions requests."
-					} else {
-						hint = "The Google API returned an error. This can sometimes happen if the document has DLP policies or other strict restrictions."
-					}
-				}
-			}
-			return ui.ErrorWithHint(fmt.Errorf("unable to retrieve revisions: %w", err), hint)
+			hint := revisionsErrorHint(fileID, err)
+			wrapped := fmt.Errorf("unable to retrieve revisions: %w", err)
+			return ui.ErrorWithHint(wrapped, hint)
 		}
 
 		if OutputFormat == "json" {
@@ -62,7 +54,7 @@ var revisionsCmd = &cobra.Command{
 			return nil
 		}
 
-		fmt.Println(ui.Accent(fmt.Sprintf("Revisions for %s:", fileId)))
+		fmt.Println(ui.Accent(fmt.Sprintf("Revisions for %s:", fileID)))
 		for _, rev := range revisions {
 			author := "Unknown"
 			if rev.LastModifyingUser != nil {
@@ -73,6 +65,21 @@ var revisionsCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func revisionsErrorHint(fileID string, err error) string {
+	hint := "Check if the file ID is correct and you have permission to view revisions."
+	if !strings.Contains(err.Error(), "500") && !strings.Contains(err.Error(), "403") {
+		return hint
+	}
+	file, describeErr := drive.DescribeFile(driveSvc, fileID)
+	if describeErr != nil {
+		return hint
+	}
+	if file.CopyRequiresWriterPermission {
+		return "This document has download/copy restrictions enabled, which can cause the Google API to reject revisions requests."
+	}
+	return "The Google API returned an error. This can sometimes happen if the document has DLP policies or other strict restrictions."
 }
 
 func init() {

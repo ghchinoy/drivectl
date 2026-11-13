@@ -38,14 +38,14 @@ For more information on query syntax, see: https://developers.google.com/drive/a
 	Example: `  drivectl list
   drivectl list --limit 20
   drivectl list -q "mimeType='application/vnd.google-apps.document'"`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		files, err := drive.ListFiles(driveSvc, limit, query)
 		if err != nil {
-			return ui.ErrorWithHint(fmt.Errorf("unable to retrieve files: %w", err), "Check your query syntax and ensure you have network access.")
+			wrapped := fmt.Errorf("unable to retrieve files: %w", err)
+			return ui.ErrorWithHint(wrapped, "Check your query syntax and ensure you have network access.")
 		}
 
 		if OutputFormat == "json" {
-			// json import added at top
 			b, err := json.MarshalIndent(files, "", "  ")
 			if err != nil {
 				return err
@@ -57,10 +57,10 @@ For more information on query syntax, see: https://developers.google.com/drive/a
 		fmt.Println(ui.Accent("Files:"))
 		if len(files) == 0 {
 			fmt.Println(ui.Muted("No files found."))
-		} else {
-			for _, i := range files {
-				fmt.Printf("%s %s\n", i.Name, ui.ID("("+i.Id+")"))
-			}
+			return nil
+		}
+		for _, i := range files {
+			fmt.Printf("%s %s\n", i.Name, ui.ID("("+i.Id+")"))
 		}
 		return nil
 	},

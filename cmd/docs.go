@@ -38,10 +38,10 @@ var docsTabsCmd = &cobra.Command{
 	Long:    `Lists the available tabs for a given Google Doc by their index number. This uses the Google Docs API.`,
 	Example: `  drivectl docs tabs <document-id>`,
 	Args:    cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		documentId := args[0]
+	RunE: func(_ *cobra.Command, args []string) error {
+		documentID := args[0]
 
-		tabs, err := drive.GetTabs(docsSvc, documentId)
+		tabs, err := drive.FetchTabs(docsSvc, documentID)
 		if err != nil {
 			return ui.ErrorWithHint(err, "Ensure the document ID is correct and is a Google Doc.")
 		}
@@ -58,20 +58,20 @@ var docsTabsCmd = &cobra.Command{
 		fmt.Println(ui.Accent("Tabs:"))
 		if len(tabs) == 0 {
 			fmt.Println(ui.Muted("No tabs found."))
-		} else {
-			var printTabs func(tabs []*drive.TabInfo, level int)
-			printTabs = func(tabs []*drive.TabInfo, level int) {
-				for _, tab := range tabs {
-					fmt.Printf("%s%s %s\n", strings.Repeat("\t", level), tab.Title, ui.ID("("+tab.TabID+")"))
-					if len(tab.Children) > 0 {
-						printTabs(tab.Children, level+1)
-					}
-				}
-			}
-			printTabs(tabs, 0)
+			return nil
 		}
+		printDocTabs(tabs, 0)
 		return nil
 	},
+}
+
+func printDocTabs(tabs []*drive.TabInfo, level int) {
+	for _, tab := range tabs {
+		fmt.Printf("%s%s %s\n", strings.Repeat("\t", level), tab.Title, ui.ID("("+tab.TabID+")"))
+		if len(tab.Children) > 0 {
+			printDocTabs(tab.Children, level+1)
+		}
+	}
 }
 
 var docsCreateCmd = &cobra.Command{
@@ -80,13 +80,14 @@ var docsCreateCmd = &cobra.Command{
 	Long:    `Creates a new Google Doc from a Markdown file.`,
 	Example: `  drivectl docs create "My Document" README.md`,
 	Args:    cobra.ExactArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, args []string) error {
 		title := args[0]
 		markdownFile := args[1]
 
 		content, err := os.ReadFile(markdownFile)
 		if err != nil {
-			return ui.ErrorWithHint(fmt.Errorf("unable to read markdown file: %w", err), "Ensure the path to the markdown file is correct.")
+			wrapped := fmt.Errorf("unable to read markdown file: %w", err)
+			return ui.ErrorWithHint(wrapped, "Ensure the path to the markdown file is correct.")
 		}
 
 		doc, err := drive.CreateDocFromMarkdown(docsSvc, title, string(content))

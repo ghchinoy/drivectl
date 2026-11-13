@@ -29,7 +29,7 @@ bin/
 test/
 
 # Ignore the drivectl binary
-drivectl
+/drivectl
 
 *.log
 .gemini/
