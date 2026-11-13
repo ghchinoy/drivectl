@@ -57,4 +57,4 @@ drivectl sheets update-range <spreadsheet-id> "Approved" --sheet "Sheet1" --rang
 
 ## Next steps
 
-Explore the full [command reference](/commands) or connect `drivectl` to an AI assistant in [MCP server & Agent Skill](/commands/mcp).
+Explore the full [command reference](/drivectl/commands) or connect `drivectl` to an AI assistant in [MCP server & Agent Skill](/drivectl/commands/mcp).

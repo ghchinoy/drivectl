@@ -45,4 +45,4 @@ Before authenticating for the first time, create a Desktop OAuth 2.0 client ID i
 
 ## Next step
 
-Continue to [Getting started](/getting-started) to log in once with `drivectl auth login` and run your first commands.
+Continue to [Getting started](/drivectl/getting-started) to log in once with `drivectl auth login` and run your first commands.

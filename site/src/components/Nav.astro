@@ -4,7 +4,9 @@ import Mark from './Mark.astro';
 import { githubStars } from '../lib/github-stars';
 
 const repo = 'https://github.com/ghchinoy/drivectl';
-const pathname = Astro.url.pathname.replace(/\/$/, '') || '/';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const rawPath = Astro.url.pathname.replace(/\/$/, '');
+const pathname = (base && rawPath.startsWith(base) ? rawPath.slice(base.length) : rawPath) || '/';
 const guideActive = ['/guide', '/install', '/getting-started', '/architecture'].includes(pathname);
 const commandsActive = pathname === '/commands' || pathname.startsWith('/commands/');
 interface Props { embedded?: boolean; }
@@ -16,15 +18,15 @@ const starLabel = stars === null ? '' : stars < 1000 ? String(stars) : `${Math.r
 
 <Tag class:list={['nav', { embedded }]}>
   <div class="wrap nav-inner">
-    <a class="brand" href="/" aria-label="drivectl home">
+    <a class="brand" href={base || '/'} aria-label="drivectl home">
       <Mark variant="split" size={34} />
       <span class="brand-name">drivectl</span>
       <span class="brand-short">drivectl</span>
     </a>
     <div class="search-slot"><slot name="search" /></div>
     <nav class="links" aria-label="Site">
-      <a href="/guide" aria-current={guideActive ? (pathname === '/guide' ? 'page' : 'location') : undefined}>Guide</a>
-      <a href="/commands" aria-current={commandsActive ? (pathname === '/commands' ? 'page' : 'location') : undefined}>Commands</a>
+      <a href={`${base}/guide`} aria-current={guideActive ? (pathname === '/guide' ? 'page' : 'location') : undefined}>Guide</a>
+      <a href={`${base}/commands`} aria-current={commandsActive ? (pathname === '/commands' ? 'page' : 'location') : undefined}>Commands</a>
     </nav>
     <Button class="github-link" size="sm" label={`drivectl on GitHub${starLabel ? `, ${starLabel} stars` : ''}`} href={repo} target="_blank">
       <svg viewBox="0 0 16 16" aria-hidden="true">

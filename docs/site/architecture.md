@@ -9,7 +9,7 @@ A central design principle in `drivectl` (documented in [Design Philosophy](../.
 
 ### When `call` is used
 
-The [`drivectl call`](/commands/discovery) command is a lightweight bridge to the Google API Discovery Service. You provide a dot-separated method identifier (`<service>.<version>.<resource>.<method>`) and a JSON `--payload`:
+The [`drivectl call`](/drivectl/commands/discovery) command is a lightweight bridge to the Google API Discovery Service. You provide a dot-separated method identifier (`<service>.<version>.<resource>.<method>`) and a JSON `--payload`:
 
 - **Uncomplicated REST/JSON:** Ideal for any Google Workspace endpoint whose request and response are pure JSON (`drive.v3.permissions.create`, `docs.v1.documents.create`, `drive.v3.files.update`).
 - **Automatic parameter routing:** `internal/discovery` inspects the Discovery Document at runtime and routes payload fields to URL path templates, query parameters, or the HTTP request body.
@@ -18,9 +18,9 @@ The [`drivectl call`](/commands/discovery) command is a lightweight bridge to th
 
 Whenever an operation involves binary streaming, multi-step protocols, or AST transformation, `drivectl` provides a dedicated subcommand under `cmd/` and `internal/drive/`:
 
-- **Media streaming & uploads:** [`drivectl upload`](/commands/drive) handles multipart media streams, parent folder placement, and custom MIME types cleanly.
-- **Document AST conversion:** [`drivectl docs create`](/commands/docs) parses local Markdown with Goldmark into Google Docs `BatchUpdate` requests, while `drivectl get --format md` walks the Google Docs structural AST (`Paragraph`, `Table`, `List`, `TextRun`) to reconstruct clean Markdown.
-- **Spreadsheet range ergonomics:** [`drivectl sheets`](/commands/sheets) wraps A1 range notation and CSV export without requiring verbose nested JSON payloads.
+- **Media streaming & uploads:** [`drivectl upload`](/drivectl/commands/drive) handles multipart media streams, parent folder placement, and custom MIME types cleanly.
+- **Document AST conversion:** [`drivectl docs create`](/drivectl/commands/docs) parses local Markdown with Goldmark into Google Docs `BatchUpdate` requests, while `drivectl get --format md` walks the Google Docs structural AST (`Paragraph`, `Table`, `List`, `TextRun`) to reconstruct clean Markdown.
+- **Spreadsheet range ergonomics:** [`drivectl sheets`](/drivectl/commands/sheets) wraps A1 range notation and CSV export without requiring verbose nested JSON payloads.
 
 ## Agent-aware CLI design
 
@@ -32,7 +32,7 @@ Whenever an operation involves binary streaming, multi-step protocols, or AST tr
 
 ## MCP schema normalization
 
-When running in [MCP server mode](/commands/mcp) (`--mcp` or `--mcp-http`), `drivectl` converts Google Discovery methods into JSON Schema tool definitions validated by `github.com/modelcontextprotocol/go-sdk`:
+When running in [MCP server mode](/drivectl/commands/mcp) (`--mcp` or `--mcp-http`), `drivectl` converts Google Discovery methods into JSON Schema tool definitions validated by `github.com/modelcontextprotocol/go-sdk`:
 
 - **Typed parameter defaults:** Discovery parameter defaults (which Google publishes as strings such as `"false"` or `"100"`) are coerced into raw JSON booleans and numbers so `ValidateDefaults: true` succeeds.
 - **`"any"` types & recursive `$ref`s:** Discovery `"type": "any"` is normalized to an unconstrained schema node, and recursive schema references (such as `docs.v1` `Tab.childTabs`) are tracked with a per-branch visited set to prevent cycles while preserving sibling `$ref` expansions.

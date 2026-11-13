@@ -1,6 +1,7 @@
 ---
 import Head from '@astrojs/starlight/components/Head.astro';
 import { Font } from 'astro:assets';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const path = Astro.url.pathname.replace(/\/$/, '');
 const isDocument = Astro.locals.starlightRoute.entry.id !== '404';
 ---
@@ -8,4 +9,4 @@ const isDocument = Astro.locals.starlightRoute.entry.id !== '404';
 <Font cssVariable="--font-display" preload />
 <Font cssVariable="--font-mono" />
 {isDocument && <link rel="alternate" type="text/markdown" href={`${path}.md`} />}
-<link rel="describedby" href="/llms.txt" />
+<link rel="describedby" href={`${base}/llms.txt`} />

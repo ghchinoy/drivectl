@@ -7,6 +7,7 @@ import { unified } from '@astrojs/markdown-remark';
 
 export default defineConfig({
   site: 'https://ghchinoy.github.io',
+  base: '/drivectl',
   output: 'static',
   trailingSlash: 'never',
 
@@ -66,11 +67,11 @@ export default defineConfig({
   markdown: { processor: unified({ remarkPlugins: [remarkRepositoryLinks] }) },
 
   redirects: {
-    '/docs': '/guide',
-    '/docs/getting-started': '/getting-started',
-    '/docs/architecture': '/architecture',
-    '/docs/commands': '/commands',
-    ...Object.fromEntries(['drive', 'docs', 'sheets', 'discovery', 'mcp'].map(cmd => [`/docs/commands/${cmd}`, `/commands/${cmd}`])),
+    '/docs': '/drivectl/guide',
+    '/docs/getting-started': '/drivectl/getting-started',
+    '/docs/architecture': '/drivectl/architecture',
+    '/docs/commands': '/drivectl/commands',
+    ...Object.fromEntries(['drive', 'docs', 'sheets', 'discovery', 'mcp'].map(cmd => [`/docs/commands/${cmd}`, `/drivectl/commands/${cmd}`])),
   },
 
   fonts: [

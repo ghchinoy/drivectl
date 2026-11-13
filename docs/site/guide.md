@@ -11,10 +11,10 @@ It is designed for both human developers working in an interactive shell and AI 
 
 ## Choose a starting point
 
-- [Install](/install): download a prebuilt binary, install via `go install`, and configure your OAuth client secret.
-- [Getting started](/getting-started): authenticate once and run your first Drive, Docs, and Sheets commands.
-- [Architecture & philosophy](/architecture): learn when `drivectl` uses dedicated native subcommands versus dynamic Discovery calls.
-- [Commands & Modes](/commands): explore the command reference, JSON recipes, and MCP server mode.
+- [Install](/drivectl/install): download a prebuilt binary, install via `go install`, and configure your OAuth client secret.
+- [Getting started](/drivectl/getting-started): authenticate once and run your first Drive, Docs, and Sheets commands.
+- [Architecture & philosophy](/drivectl/architecture): learn when `drivectl` uses dedicated native subcommands versus dynamic Discovery calls.
+- [Commands & Modes](/drivectl/commands): explore the command reference, JSON recipes, and MCP server mode.
 
 ## Core capabilities
 

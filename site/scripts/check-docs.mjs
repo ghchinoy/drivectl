@@ -7,6 +7,8 @@ import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkStringify from 'remark-stringify';
 
+const BASE = '/drivectl';
+
 const originalFetch = globalThis.fetch;
 try {
   const cases = [
@@ -31,7 +33,7 @@ try {
 const source = new URL('../../skills/google-drive-cli/SKILL.md', import.meta.url).pathname;
 assert.equal(repositoryLink('../../docs/DESIGN_PHILOSOPHY.md', source), 'https://github.com/ghchinoy/drivectl/blob/main/docs/DESIGN_PHILOSOPHY.md');
 assert.equal(repositoryLink('references/drive.md', source), 'https://github.com/ghchinoy/drivectl/blob/main/skills/google-drive-cli/references/drive.md');
-for (const url of ['#section', '/guide', 'https://github.com/ghchinoy/drivectl', 'mailto:hello@example.com']) {
+for (const url of ['#section', '/drivectl/guide', 'https://github.com/ghchinoy/drivectl', 'mailto:hello@example.com']) {
   assert.equal(repositoryLink(url, source), url);
 }
 assert.equal(repositoryLink('../../docs/DESIGN_PHILOSOPHY.md#native-subcommands', source), 'https://github.com/ghchinoy/drivectl/blob/main/docs/DESIGN_PHILOSOPHY.md#native-subcommands');
@@ -92,16 +94,34 @@ const pages = [
   'commands/mcp',
 ];
 
+async function verifyHtmlAssetsAndBaseLinks(html, label) {
+  assert.ok(!/(?:href|src)="\/_astro\//.test(html), `${label}: must not contain unprefixed /_astro/ URLs`);
+  const assets = [...html.matchAll(/(?:href|src)="\/drivectl(\/_astro\/[^"?#]+)"/g)];
+  assert.ok(assets.length > 0, `${label}: must reference /drivectl/_astro/ assets`);
+  for (const [, asset] of assets) {
+    await access(new URL(`../dist${asset}`, import.meta.url));
+  }
+  for (const [, href] of html.matchAll(/href="(\/[^"]*)"/g)) {
+    assert.ok(
+      href === BASE || href.startsWith(`${BASE}/`),
+      `${label}: root-relative href "${href}" is missing the "${BASE}" base prefix`,
+    );
+  }
+}
+
+const indexHtml = await readFile(new URL('../dist/index.html', import.meta.url), 'utf8');
+assert.equal((indexHtml.match(/<h1\b/g) ?? []).length, 1, 'index: one page title');
+await verifyHtmlAssetsAndBaseLinks(indexHtml, 'index');
+
 for (const page of pages) {
   const html = await readFile(new URL(`../dist/${page}/index.html`, import.meta.url), 'utf8');
   const markdown = await readFile(new URL(`../dist/${page}.md`, import.meta.url), 'utf8');
   assert.equal((html.match(/<h1\b/g) ?? []).length, 1, `${page}: one page title`);
   assert.ok(html.includes('type="text/markdown"'), `${page}: discoverable Markdown`);
+  assert.ok(html.includes(`href="${BASE}/${page}.md"`), `${page}: base-prefixed Markdown alternate link`);
   assert.ok(markdown.startsWith('# '), `${page}: Markdown title`);
   assert.ok(!markdown.includes('<nav'), `${page}: no page chrome`);
-  for (const [, asset] of html.matchAll(/(?:href|src)="(\/_astro\/[^"?#]+)"/g)) {
-    await access(new URL(`../dist${asset}`, import.meta.url));
-  }
+  await verifyHtmlAssetsAndBaseLinks(html, page);
 }
 
 for (const file of ['llms.txt', 'llms-full.txt', 'llms-small.txt', 'pagefind/pagefind.js']) {
@@ -117,10 +137,10 @@ const redirects = [
 ];
 for (const [oldPath, target] of redirects) {
   const html = await readFile(new URL(`../dist/${oldPath}/index.html`, import.meta.url), 'utf8');
-  assert.ok(html.includes(`content="0;url=/${target}"`), `${oldPath}: redirect target`);
+  assert.ok(html.includes(`content="0;url=${BASE}/${target}"`), `${oldPath}: redirect target`);
 }
 
 const full = await readFile(new URL('../dist/llms-full.txt', import.meta.url), 'utf8');
 assert.ok(full.includes('drivectl'));
 assert.ok(full.includes('Getting started'));
-console.log('Documentation routes, Markdown exports, repository links, llms.txt and search index passed.');
+console.log('Documentation routes, base-prefixed assets/links, Markdown exports, repository links, llms.txt and search index passed.');

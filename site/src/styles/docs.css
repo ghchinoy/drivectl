@@ -83,13 +83,13 @@ mobile-starlight-toc .dropdown { box-shadow: none; border-color: var(--md-sys-co
 .sl-markdown-content a:not(.btn, .icon-btn, .list-item):hover { text-decoration-color: currentColor; }
 .sl-markdown-content pre { font-size: .875rem; }
 .sl-markdown-content table { display: block; overflow: auto; }
-.sl-markdown-content ul:has(>li>p>a[href^='/commands/']) { list-style: none; padding: 0; }
-.sl-markdown-content ul:has(>li>p>a[href^='/commands/']) > li { padding: 16px 0; margin: 0; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
-.sl-markdown-content ul:has(>li>p>a[href^='/commands/']) > li > p:first-child { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin: 0; }
-.sl-markdown-content ul:has(>li>p>a[href^='/commands/']) > li > p + p { margin: 6px 0 0; font-size: .875rem; color: var(--md-sys-color-on-surface-variant); }
-.sl-markdown-content ul:has(>li>p>a[href^='/commands/']) a { font-weight: 500; text-decoration: none; }
-.sl-markdown-content ul:has(>li>p>a[href^='/commands/']) a:hover { text-decoration: underline; }
-.sl-markdown-content ul:has(>li>p>a[href^='/commands/']) code { background: transparent; padding: 0; font-size: .75rem; color: var(--md-sys-color-on-surface-variant); }
+.sl-markdown-content ul:has(>li>p>a[href*='/commands/']) { list-style: none; padding: 0; }
+.sl-markdown-content ul:has(>li>p>a[href*='/commands/']) > li { padding: 16px 0; margin: 0; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+.sl-markdown-content ul:has(>li>p>a[href*='/commands/']) > li > p:first-child { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin: 0; }
+.sl-markdown-content ul:has(>li>p>a[href*='/commands/']) > li > p + p { margin: 6px 0 0; font-size: .875rem; color: var(--md-sys-color-on-surface-variant); }
+.sl-markdown-content ul:has(>li>p>a[href*='/commands/']) a { font-weight: 500; text-decoration: none; }
+.sl-markdown-content ul:has(>li>p>a[href*='/commands/']) a:hover { text-decoration: underline; }
+.sl-markdown-content ul:has(>li>p>a[href*='/commands/']) code { background: transparent; padding: 0; font-size: .75rem; color: var(--md-sys-color-on-surface-variant); }
 .expressive-code .copy button { border-radius: 50%; border: 0; background: transparent; }
 .expressive-code .copy button::before { border: 0; }
 .expressive-code .copy button::after { mask-image: url('../assets/symbols/content_copy.svg'); }
