@@ -228,8 +228,8 @@ func TestCallMethod(t *testing.T) {
 					Request: req,
 				}, nil
 			case req.Method == http.MethodPatch && req.URL.Path == "/drive/v3/files/f-1":
-				if req.URL.Query().Get("supportsAllDrives") != "true" {
-					t.Errorf("CallMethod query supportsAllDrives = %q, want \"true\"", req.URL.Query().Get("supportsAllDrives"))
+				if got := req.URL.Query().Get("supportsAllDrives"); got != "true" {
+					t.Errorf("CallMethod(ctx, client, %q, payload) query supportsAllDrives = %q, want %q", "drive.v3.files.update", got, "true")
 				}
 				return &http.Response{
 					StatusCode: http.StatusOK,

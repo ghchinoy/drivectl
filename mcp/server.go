@@ -28,11 +28,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ghchinoy/drivectl/pkg/discovery"
-	"github.com/ghchinoy/drivectl/pkg/drive"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/ghchinoy/drivectl/pkg/discovery"
+	"github.com/ghchinoy/drivectl/pkg/drive"
 )
 
 const driveQueryCheatSheet = `
@@ -264,8 +265,8 @@ func registerDynamicEndpoint(
 	}
 
 	mcp.AddTool(server, mcpTool, func(ctx context.Context, _ *mcp.CallToolRequest, args map[string]any) (*mcp.CallToolResult, any, error) {
-		res, err := executeDynamicCall(ctx, clientProvider, doc, method, args)
-		return res, nil, err
+		callResult, err := executeDynamicCall(ctx, clientProvider, doc, method, args)
+		return callResult, nil, err
 	})
 }
 

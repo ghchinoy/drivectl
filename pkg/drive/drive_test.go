@@ -178,7 +178,7 @@ func TestNewClientFromBearerTokenAndServices(t *testing.T) {
 		t.Errorf("ListFiles(svcs.Drive, 5, \"\") = %+v, want 1 file \"f1\"", files)
 	}
 	if gotAuthHeader != "Bearer stateless-token-xyz" {
-		t.Errorf("Authorization header = %q, want \"Bearer stateless-token-xyz\"", gotAuthHeader)
+		t.Errorf("NewClientFromBearerToken(ctx, %q) Authorization header = %q, want %q", "stateless-token-xyz", gotAuthHeader, "Bearer stateless-token-xyz")
 	}
 }
 
@@ -403,7 +403,7 @@ func newFakeServices(t *testing.T, ctx context.Context) (*drive.Service, *docs.S
 
 	svcs, err := NewServicesFromClient(ctx, httpClient)
 	if err != nil {
-		t.Fatalf("NewServicesFromClient() error = %v", err)
+		t.Fatalf("NewServicesFromClient(ctx, httpClient) error = %v", err)
 	}
 	return svcs.Drive, svcs.Docs, svcs.Sheets, svcs.Slides
 }

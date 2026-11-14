@@ -48,9 +48,8 @@ func parseMCPFlags(args []string) (bool, string) {
 			return true, ""
 		}
 		if strings.HasPrefix(arg, "--mcp-http") {
-			parts := strings.SplitN(arg, "=", 2)
-			if len(parts) == 2 {
-				return false, parts[1]
+			if _, addr, ok := strings.Cut(arg, "="); ok {
+				return false, addr
 			}
 			if i+1 < len(args) {
 				return false, args[i+1]

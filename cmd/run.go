@@ -19,8 +19,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ghchinoy/drivectl/internal/ui"
 	"github.com/spf13/cobra"
+
+	"github.com/ghchinoy/drivectl/internal/ui"
 )
 
 // Recipe defines a sequence of command-line string arguments to pass to the CLI.

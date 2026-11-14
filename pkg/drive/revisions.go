@@ -21,8 +21,8 @@ import (
 )
 
 // ListRevisions retrieves a list of revisions for a given file ID.
-func ListRevisions(srv *drive.Service, fileID string) ([]*drive.Revision, error) {
-	call := srv.Revisions.List(fileID).Fields("revisions(id,modifiedTime,lastModifyingUser(displayName,emailAddress),size,originalFilename,mimeType)")
+func ListRevisions(driveSvc *drive.Service, fileID string) ([]*drive.Revision, error) {
+	call := driveSvc.Revisions.List(fileID).Fields("revisions(id,modifiedTime,lastModifyingUser(displayName,emailAddress),size,originalFilename,mimeType)")
 	resp, err := call.Do()
 	if err != nil {
 		return nil, fmt.Errorf("unable to list revisions: %w", err)

@@ -21,8 +21,8 @@ import (
 )
 
 // ListComments retrieves a list of comments for a given file ID.
-func ListComments(srv *drive.Service, fileID string) ([]*drive.Comment, error) {
-	call := srv.Comments.List(fileID).Fields("comments(id,content,author(displayName,emailAddress),createdTime,resolved,quotedFileContent(value),replies(id,content,author(displayName,emailAddress),createdTime,action))")
+func ListComments(driveSvc *drive.Service, fileID string) ([]*drive.Comment, error) {
+	call := driveSvc.Comments.List(fileID).Fields("comments(id,content,author(displayName,emailAddress),createdTime,resolved,quotedFileContent(value),replies(id,content,author(displayName,emailAddress),createdTime,action))")
 	resp, err := call.Do()
 	if err != nil {
 		return nil, fmt.Errorf("unable to list comments: %w", err)

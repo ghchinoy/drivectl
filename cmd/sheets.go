@@ -21,9 +21,10 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/spf13/cobra"
+
 	"github.com/ghchinoy/drivectl/internal/ui"
 	"github.com/ghchinoy/drivectl/pkg/drive"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -83,12 +84,12 @@ var sheetsGetCmd = &cobra.Command{
 		}
 
 		if OutputFormat == "json" {
-			res := map[string]any{
+			output := map[string]any{
 				"spreadsheetId": spreadsheetID,
 				"sheetName":     sheetName,
 				"csv":           csv,
 			}
-			b, err := json.MarshalIndent(res, "", "  ")
+			b, err := json.MarshalIndent(output, "", "  ")
 			if err != nil {
 				return err
 			}
@@ -163,14 +164,14 @@ var sheetsUpdateRangeCmd = &cobra.Command{
 		}
 
 		if OutputFormat == "json" {
-			res := map[string]any{
+			output := map[string]any{
 				"status":        "success",
 				"spreadsheetId": spreadsheetID,
 				"sheetName":     sheetName,
 				"range":         sheetRange,
 				"updatedValue":  value,
 			}
-			b, err := json.MarshalIndent(res, "", "  ")
+			b, err := json.MarshalIndent(output, "", "  ")
 			if err != nil {
 				return err
 			}

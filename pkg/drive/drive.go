@@ -52,19 +52,19 @@ var formatMap = map[string]string{
 }
 
 // ListFiles lists the files and folders in Google Drive.
-func ListFiles(srv *drive.Service, limit int64, query string) ([]*drive.File, error) {
-	r, err := srv.Files.List().PageSize(limit).Q(query).
+func ListFiles(driveSvc *drive.Service, limit int64, query string) ([]*drive.File, error) {
+	fileList, err := driveSvc.Files.List().PageSize(limit).Q(query).
 		Fields("nextPageToken, files(id, name)").Do()
 	if err != nil {
 		return nil, err
 	}
-	return r.Files, nil
+	return fileList.Files, nil
 }
 
 // FetchFile downloads a file or exports a Google Doc.
 func FetchFile(driveSvc *drive.Service, docsSvc *docs.Service, fileID, format, tabID string) ([]byte, error) {
 	if tabID != "" {
-		return getDocumentTabContent(docsSvc, fileID, tabID)
+		return fetchDocumentTabContent(docsSvc, fileID, tabID)
 	}
 
 	file, err := driveSvc.Files.Get(fileID).Fields("mimeType", "name").Do()
@@ -145,7 +145,7 @@ func CreateDocFromMarkdown(docsSvc *docs.Service, title, markdownContent string)
 }
 
 // UploadFile uploads a local file to Google Drive.
-func UploadFile(srv *drive.Service, filePath, parentID string) (*drive.File, error) {
+func UploadFile(driveSvc *drive.Service, filePath, parentID string) (*drive.File, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to open file %q: %w", filePath, err)
@@ -153,18 +153,18 @@ func UploadFile(srv *drive.Service, filePath, parentID string) (*drive.File, err
 	defer file.Close()
 
 	fileName := filepath.Base(filePath)
-	f := &drive.File{
+	meta := &drive.File{
 		Name: fileName,
 	}
 	if parentID != "" {
-		f.Parents = []string{parentID}
+		meta.Parents = []string{parentID}
 	}
 
-	res, err := srv.Files.Create(f).Media(file).Do()
+	uploadedFile, err := driveSvc.Files.Create(meta).Media(file).Do()
 	if err != nil {
 		return nil, fmt.Errorf("unable to create file %q: %w", fileName, err)
 	}
-	return res, nil
+	return uploadedFile, nil
 }
 
 // renderBodyAsText converts a Google Docs Body object to a Markdown string.
@@ -252,7 +252,7 @@ func findTab(tabs []*docs.Tab, tabID string) *docs.Tab {
 	return nil
 }
 
-func getDocumentTabContent(docsSvc *docs.Service, fileID, tabID string) ([]byte, error) {
+func fetchDocumentTabContent(docsSvc *docs.Service, fileID, tabID string) ([]byte, error) {
 	doc, err := docsSvc.Documents.Get(fileID).IncludeTabsContent(true).Do()
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve document with tabs: %w", err)

@@ -18,9 +18,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/ghchinoy/drivectl/internal/ui"
 	"github.com/ghchinoy/drivectl/pkg/drive"
-	"github.com/spf13/cobra"
 )
 
 var parentID string
@@ -37,13 +38,13 @@ Optionally, specify a parent folder ID to upload the file to a specific folder.`
 	RunE: func(_ *cobra.Command, args []string) error {
 		filePath := args[0]
 
-		res, err := drive.UploadFile(driveSvc, filePath, parentID)
+		uploadedFile, err := drive.UploadFile(driveSvc, filePath, parentID)
 		if err != nil {
 			return ui.ErrorWithHint(err, "Ensure the file path is correct and you have permission to upload.")
 		}
 
 		if OutputFormat == "json" {
-			b, err := json.MarshalIndent(res, "", "  ")
+			b, err := json.MarshalIndent(uploadedFile, "", "  ")
 			if err != nil {
 				return err
 			}
@@ -51,7 +52,7 @@ Optionally, specify a parent folder ID to upload the file to a specific folder.`
 			return nil
 		}
 
-		ui.PrintSuccess("Successfully uploaded file: %s (ID: %s)", res.Name, res.Id)
+		ui.PrintSuccess("Successfully uploaded file: %s (ID: %s)", uploadedFile.Name, uploadedFile.Id)
 		return nil
 	},
 }

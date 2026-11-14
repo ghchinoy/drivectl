@@ -177,15 +177,15 @@ func CallMethod(ctx context.Context, client *http.Client, endpoint string, paylo
 	return doc.CallMethod(ctx, client, resourcePath, methodName, payload, false)
 }
 
-// CallMethod resolves a nested resource path and method name inside doc,
+// CallMethod resolves a nested resource path and method name inside d,
 // builds and executes the HTTP request, and returns the raw response body.
-func (doc *RestDescription) CallMethod(ctx context.Context, client *http.Client, resourcePath []string, methodName string, payload map[string]any, unwrapPayloadKey bool) ([]byte, error) {
-	method, err := FindMethod(doc, resourcePath, methodName)
+func (d *RestDescription) CallMethod(ctx context.Context, client *http.Client, resourcePath []string, methodName string, payload map[string]any, unwrapPayloadKey bool) ([]byte, error) {
+	method, err := FindMethod(d, resourcePath, methodName)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := BuildRequest(ctx, doc, method, payload, unwrapPayloadKey)
+	req, err := BuildRequest(ctx, d, method, payload, unwrapPayloadKey)
 	if err != nil {
 		return nil, err
 	}

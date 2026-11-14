@@ -18,9 +18,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/ghchinoy/drivectl/internal/ui"
 	"github.com/ghchinoy/drivectl/pkg/drive"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -59,8 +60,8 @@ For more information on query syntax, see: https://developers.google.com/drive/a
 			fmt.Println(ui.Muted("No files found."))
 			return nil
 		}
-		for _, i := range files {
-			fmt.Printf("%s %s\n", i.Name, ui.ID("("+i.Id+")"))
+		for _, file := range files {
+			fmt.Printf("%s %s\n", file.Name, ui.ID("("+file.Id+")"))
 		}
 		return nil
 	},

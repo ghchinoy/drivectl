@@ -19,9 +19,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/ghchinoy/drivectl/internal/ui"
 	"github.com/ghchinoy/drivectl/pkg/drive"
-	"github.com/spf13/cobra"
 )
 
 var revisionsCmd = &cobra.Command{

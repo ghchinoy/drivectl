@@ -19,9 +19,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"github.com/ghchinoy/drivectl/internal/ui"
 	"github.com/ghchinoy/drivectl/pkg/drive"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -51,13 +52,13 @@ It can also extract the plain text content of a single tab from a Google Doc usi
 		}
 
 		if OutputFormat == "json" {
-			res := map[string]any{
+			output := map[string]any{
 				"fileId":  fileID,
 				"content": string(content),
 				"format":  format,
 				"tabId":   tabID,
 			}
-			b, err := json.MarshalIndent(res, "", "  ")
+			b, err := json.MarshalIndent(output, "", "  ")
 			if err != nil {
 				return err
 			}
