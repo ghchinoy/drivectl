@@ -66,15 +66,6 @@ var docsTabsCmd = &cobra.Command{
 	},
 }
 
-func printDocTabs(tabs []*drive.TabInfo, level int) {
-	for _, tab := range tabs {
-		fmt.Printf("%s%s %s\n", strings.Repeat("\t", level), tab.Title, ui.ID("("+tab.TabID+")"))
-		if len(tab.Children) > 0 {
-			printDocTabs(tab.Children, level+1)
-		}
-	}
-}
-
 var docsCreateCmd = &cobra.Command{
 	Use:     "create [title] [markdown-file]",
 	Short:   "Creates a new Google Doc from a Markdown file.",
@@ -87,7 +78,7 @@ var docsCreateCmd = &cobra.Command{
 
 		content, err := os.ReadFile(markdownFile)
 		if err != nil {
-			wrapped := fmt.Errorf("unable to read markdown file: %w", err)
+			wrapped := fmt.Errorf("unable to read markdown file %q: %w", markdownFile, err)
 			return ui.ErrorWithHint(wrapped, "Ensure the path to the markdown file is correct.")
 		}
 
@@ -108,6 +99,15 @@ var docsCreateCmd = &cobra.Command{
 		ui.PrintSuccess("Created document %s %s", doc.Title, ui.ID("("+doc.DocumentId+")"))
 		return nil
 	},
+}
+
+func printDocTabs(tabs []*drive.TabInfo, level int) {
+	for _, tab := range tabs {
+		fmt.Printf("%s%s %s\n", strings.Repeat("\t", level), tab.Title, ui.ID("("+tab.TabID+")"))
+		if len(tab.Children) > 0 {
+			printDocTabs(tab.Children, level+1)
+		}
+	}
 }
 
 func init() {

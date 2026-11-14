@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -246,7 +247,7 @@ func FindMethod(doc *RestDescription, resourcePath []string, methodName string) 
 // BuildRequest constructs an HTTP request for a Discovery method from a parsed argument map.
 func BuildRequest(ctx context.Context, doc *RestDescription, method *RestMethod, parsed map[string]any, unwrapPayloadKey bool) (*http.Request, error) {
 	apiURL := resolveMethodURL(doc, method)
-	params := cloneMap(parsed)
+	params := maps.Clone(parsed)
 
 	var err error
 	apiURL, err = substitutePathParams(apiURL, method, params)
@@ -282,17 +283,6 @@ func resolveMethodURL(doc *RestDescription, method *RestMethod) string {
 		return doc.RootURL + doc.ServicePath + method.Path
 	}
 	return method.Path
-}
-
-func cloneMap(src map[string]any) map[string]any {
-	if src == nil {
-		return nil
-	}
-	dst := make(map[string]any, len(src))
-	for k, v := range src {
-		dst[k] = v
-	}
-	return dst
 }
 
 func substitutePathParams(apiURL string, method *RestMethod, params map[string]any) (string, error) {

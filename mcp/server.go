@@ -108,7 +108,7 @@ func Start(ctx context.Context, _ *cobra.Command, httpAddr string) error {
 		}
 		go func() {
 			<-ctx.Done()
-			_ = srv.Shutdown(ctx)
+			_ = srv.Shutdown(context.WithoutCancel(ctx))
 		}()
 		log.Printf("MCP handler listening at %s", httpAddr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -135,51 +135,6 @@ func Start(ctx context.Context, _ *cobra.Command, httpAddr string) error {
 	}
 
 	return nil
-}
-
-func newHTTPClient(ctx context.Context) (*http.Client, error) {
-	viper.AutomaticEnv()
-	secretFile := viper.GetString("secret-file")
-	if secretFile == "" {
-		configDir, err := drive.ConfigDir()
-		if err == nil {
-			secretFile = filepath.Join(configDir, "client_secret.json")
-		}
-	}
-	noBrowserAuth := viper.GetBool("no-browser-auth")
-	client, err := drive.NewOAuthClient(ctx, secretFile, noBrowserAuth)
-	if err != nil {
-		return nil, fmt.Errorf("could not create oauth client: %w", err)
-	}
-	return client, nil
-}
-
-func driveQueryCheatSheetHandler(_ context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
-	return &mcp.ReadResourceResult{
-		Contents: []*mcp.ResourceContents{
-			{
-				URI:      req.Params.URI,
-				MIMEType: "text/plain",
-				Text:     driveQueryCheatSheet,
-			},
-		},
-	}, nil
-}
-
-func a1NotationCheatSheetHandler(_ context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
-	return &mcp.ReadResourceResult{
-		Contents: []*mcp.ResourceContents{
-			{
-				URI:      req.Params.URI,
-				MIMEType: "text/plain",
-				Text:     a1NotationCheatSheet,
-			},
-		},
-	}, nil
-}
-
-func registerToolsAndResources(ctx context.Context, server *mcp.Server) error {
-	return RegisterTools(ctx, server, apiClientFactory, WithDiscoveryHTTPClient(discoveryHTTPClient))
 }
 
 // RegisterTools mounts drivectl's embedded resources and Discovery-backed Google Workspace
@@ -223,6 +178,51 @@ func RegisterTools(ctx context.Context, server *mcp.Server, clientProvider Clien
 	}
 
 	return nil
+}
+
+func registerToolsAndResources(ctx context.Context, server *mcp.Server) error {
+	return RegisterTools(ctx, server, apiClientFactory, WithDiscoveryHTTPClient(discoveryHTTPClient))
+}
+
+func newHTTPClient(ctx context.Context) (*http.Client, error) {
+	viper.AutomaticEnv()
+	secretFile := viper.GetString("secret-file")
+	if secretFile == "" {
+		configDir, err := drive.ConfigDir()
+		if err == nil {
+			secretFile = filepath.Join(configDir, "client_secret.json")
+		}
+	}
+	noBrowserAuth := viper.GetBool("no-browser-auth")
+	client, err := drive.NewOAuthClient(ctx, secretFile, noBrowserAuth)
+	if err != nil {
+		return nil, fmt.Errorf("could not create oauth client: %w", err)
+	}
+	return client, nil
+}
+
+func driveQueryCheatSheetHandler(_ context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+	return &mcp.ReadResourceResult{
+		Contents: []*mcp.ResourceContents{
+			{
+				URI:      req.Params.URI,
+				MIMEType: "text/plain",
+				Text:     driveQueryCheatSheet,
+			},
+		},
+	}, nil
+}
+
+func a1NotationCheatSheetHandler(_ context.Context, req *mcp.ReadResourceRequest) (*mcp.ReadResourceResult, error) {
+	return &mcp.ReadResourceResult{
+		Contents: []*mcp.ResourceContents{
+			{
+				URI:      req.Params.URI,
+				MIMEType: "text/plain",
+				Text:     a1NotationCheatSheet,
+			},
+		},
+	}, nil
 }
 
 func registerDynamicEndpoint(

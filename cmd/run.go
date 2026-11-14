@@ -42,7 +42,7 @@ var runCmd = &cobra.Command{
 		file := args[0]
 		b, err := os.ReadFile(file)
 		if err != nil {
-			wrapped := fmt.Errorf("failed to read recipe: %w", err)
+			wrapped := fmt.Errorf("failed to read recipe %q: %w", file, err)
 			return ui.ErrorWithHint(wrapped, "Ensure the recipe file exists and you have read permissions.")
 		}
 

@@ -84,13 +84,13 @@ It will save the credentials to a local configuration directory for future use.`
 func copySecretFile(srcPath, dstPath string) error {
 	source, err := os.Open(srcPath)
 	if err != nil {
-		return fmt.Errorf("failed to open source secret file: %w", err)
+		return fmt.Errorf("failed to open source secret file %q: %w", srcPath, err)
 	}
 	defer source.Close()
 
 	destination, err := os.OpenFile(dstPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
-		return fmt.Errorf("failed to create target secret file: %w", err)
+		return fmt.Errorf("failed to create target secret file %q: %w", dstPath, err)
 	}
 
 	_, copyErr := io.Copy(destination, source)
@@ -99,7 +99,7 @@ func copySecretFile(srcPath, dstPath string) error {
 		return fmt.Errorf("failed to copy secret file: %w", copyErr)
 	}
 	if closeErr != nil {
-		return fmt.Errorf("failed to close target secret file: %w", closeErr)
+		return fmt.Errorf("failed to close target secret file %q: %w", dstPath, closeErr)
 	}
 	return nil
 }

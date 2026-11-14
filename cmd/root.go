@@ -19,7 +19,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -91,10 +90,7 @@ Google Docs, including exporting to multiple formats and accessing individual ta
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	ui.HandleError(rootCmd.Execute())
 }
 
 // ExecuteContext executes the root command with the provided context.

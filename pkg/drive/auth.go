@@ -185,19 +185,12 @@ func FetchClient(ctx context.Context, config *oauth2.Config, noBrowserAuth bool)
 	return config.Client(ctx, tok), nil
 }
 
-func fetchOAuthToken(ctx context.Context, config *oauth2.Config, noBrowserAuth bool) (*oauth2.Token, error) {
-	if noBrowserAuth {
-		return FetchTokenFromWeb(ctx, config)
-	}
-	return FetchTokenFromWebWithBrowser(ctx, config)
-}
-
 // FetchTokenFromWebWithBrowser uses a local web server to handle the OAuth 2.0 callback flow.
 func FetchTokenFromWebWithBrowser(ctx context.Context, config *oauth2.Config) (*oauth2.Token, error) {
 	config.RedirectURL = "http://localhost:8080"
 	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 
-	fmt.Println("Your browser has been opened to visit:", authURL)
+	fmt.Fprintln(os.Stderr, "Your browser has been opened to visit:", authURL)
 	if err := browser.OpenURL(authURL); err != nil {
 		return nil, fmt.Errorf("failed to open browser: %w", err)
 	}
@@ -210,7 +203,7 @@ func FetchTokenFromWebWithBrowser(ctx context.Context, config *oauth2.Config) (*
 		Handler: newOAuthCallbackHandler(codeChan, errChan),
 	}
 	defer func() {
-		_ = srv.Shutdown(ctx)
+		_ = srv.Shutdown(context.WithoutCancel(ctx))
 	}()
 
 	go func() {
@@ -229,35 +222,10 @@ func FetchTokenFromWebWithBrowser(ctx context.Context, config *oauth2.Config) (*
 	}
 }
 
-func newOAuthCallbackHandler(codeChan chan<- string, errChan chan<- error) http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		code := r.URL.Query().Get("code")
-		if code == "" {
-			fmt.Fprintln(w, "Invalid request. No authorization code received.")
-			sendNonBlockingErr(errChan, errors.New("no code in request"))
-			return
-		}
-		fmt.Fprintln(w, "Authentication successful! You can close this browser window.")
-		select {
-		case codeChan <- code:
-		default:
-		}
-	})
-	return mux
-}
-
-func sendNonBlockingErr(errChan chan<- error, err error) {
-	select {
-	case errChan <- err:
-	default:
-	}
-}
-
 // FetchTokenFromWeb requests an OAuth 2.0 token from the web via manual terminal code entry.
 func FetchTokenFromWeb(ctx context.Context, config *oauth2.Config) (*oauth2.Token, error) {
 	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
-	fmt.Printf("Go to the following link in your browser then type the authorization code: \n%v\n", authURL)
+	fmt.Fprintf(os.Stderr, "Go to the following link in your browser then type the authorization code: \n%v\n", authURL)
 
 	var authCode string
 	if _, err := fmt.Scan(&authCode); err != nil {
@@ -294,7 +262,7 @@ func TokenFromFile(file string) (*oauth2.Token, error) {
 
 // SaveToken saves an OAuth 2.0 token to a file with restricted permissions.
 func SaveToken(file string, token *oauth2.Token) error {
-	fmt.Printf("Saving credential file to: %s\n", file)
+	fmt.Fprintf(os.Stderr, "Saving credential file to: %s\n", file)
 	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("unable to cache oauth token: %w", err)
@@ -304,4 +272,36 @@ func SaveToken(file string, token *oauth2.Token) error {
 		err = closeErr
 	}
 	return err
+}
+
+func fetchOAuthToken(ctx context.Context, config *oauth2.Config, noBrowserAuth bool) (*oauth2.Token, error) {
+	if noBrowserAuth {
+		return FetchTokenFromWeb(ctx, config)
+	}
+	return FetchTokenFromWebWithBrowser(ctx, config)
+}
+
+func newOAuthCallbackHandler(codeChan chan<- string, errChan chan<- error) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+		if code == "" {
+			fmt.Fprintln(w, "Invalid request. No authorization code received.")
+			sendNonBlockingErr(errChan, errors.New("no code in request"))
+			return
+		}
+		fmt.Fprintln(w, "Authentication successful! You can close this browser window.")
+		select {
+		case codeChan <- code:
+		default:
+		}
+	})
+	return mux
+}
+
+func sendNonBlockingErr(errChan chan<- error, err error) {
+	select {
+	case errChan <- err:
+	default:
+	}
 }
