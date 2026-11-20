@@ -86,15 +86,23 @@ Once installed and provided with a Desktop OAuth `client_secret.json` (see [Gett
 
 ## Getting a Google OAuth Client Secret
 
+`drivectl` authenticates as your Google user via an **OAuth 2.0 Desktop app** client secret.
+
+> [!IMPORTANT]
+> You need an **OAuth 2.0 Client ID (Desktop app)** JSON file whose top-level key is `{"installed": {...}}`. Do **not** use a **Service Account** JSON key (`{"type": "service_account", ...}` — not currently supported), an **API key**, or a **Web application** OAuth client (`{"web": ...}`, which rejects loopback redirects unless `http://localhost:8080` is manually registered).
+
 1. Open the [Google Cloud Console](https://console.cloud.google.com/) and create or select a project.
 2. Navigate to **APIs & Services > Library** and enable:
    - **Google Drive API** (`drive.googleapis.com`)
    - **Google Docs API** (`docs.googleapis.com`)
    - **Google Sheets API** (`sheets.googleapis.com`)
    - **Google Slides API** (`slides.googleapis.com`)
-3. Navigate to **APIs & Services > Credentials**.
-4. Click **Create Credentials > OAuth client ID** and select **Desktop app** as the application type.
-5. Download the JSON file, save it as `client_secret.json`, and pass it once to `drivectl auth login --secret-file client_secret.json`.
+3. Configure the OAuth consent screen under **Google Auth Platform** (or **APIs & Services > OAuth consent screen**):
+   - Under **Branding**, set an app name and support email.
+   - Under **Audience**, choose **Internal** (if you are in a Google Workspace organization and only org users will sign in) or **External** (for personal Gmail accounts or cross-org use).
+   - If **External** is left in **Testing** publishing status, open **Audience > Test users** and add the Google email address(es) you will authenticate with — otherwise login fails with `Error 403: access_denied`. *(Note: Google expires refresh tokens for External apps in Testing mode after 7 days; re-run `drivectl auth login` when needed.)*
+4. Navigate to **Google Auth Platform > Clients** (or **APIs & Services > Credentials**), click **Create Client** / **Create Credentials > OAuth client ID**, and select **Desktop app** as the application type.
+5. Download the JSON file (verify it starts with `{"installed": ...}`), save it as `client_secret.json`, and pass it once to `drivectl auth login --secret-file client_secret.json` (or set `DRIVE_SECRETS=/path/to/client_secret.json`).
 
 ## Usage & Command Reference
 
@@ -120,15 +128,23 @@ Once installed and provided with a Desktop OAuth `client_secret.json` (see [Gett
 
 ### Authentication (`auth`)
 
-`drivectl` caches your client secret and OAuth token in `~/.config/drivectl/` and refreshes tokens automatically.
+`drivectl` caches your client secret (`client_secret.json`) and OAuth token (`token.json`) in `~/.config/drivectl/` and refreshes access tokens automatically. You can also supply the secret path via the `DRIVE_SECRETS` environment variable (`--secret-file` takes precedence over `DRIVE_SECRETS`, which takes precedence over `~/.config/drivectl/client_secret.json`).
 
 ```bash
-# Browser-based OAuth login (default)
+# Browser-based OAuth login (default; listens briefly on http://localhost:8080)
 ./drivectl auth login --secret-file /path/to/client_secret.json
+
+# Or supply the secret path via environment variable
+DRIVE_SECRETS=/path/to/client_secret.json ./drivectl auth login
 
 # Headless / remote session login (prints manual authorization URL)
 ./drivectl auth login --secret-file /path/to/client_secret.json --no-browser-auth
 ```
+
+> [!NOTE]
+> - **Local callback port (`8080`):** Default browser login temporarily starts a local HTTP listener on `http://localhost:8080` to capture the OAuth callback. Ensure port `8080` is free during login (for example, stop any local dev server or `drivectl --mcp-http :8080` first).
+> - **Headless (`--no-browser-auth`):** Open the printed URL in a browser on any device and grant access. After consenting, the browser redirects to `http://localhost/?state=...&code=...` (a "cannot connect" page is expected). Copy the `code` query parameter value from the browser address bar and paste it into the terminal prompt.
+> - **Re-authenticating:** Once cached, run `./drivectl auth login` without `--secret-file` to force a fresh consent flow (for example, after new scopes are added or a 7-day Testing-mode refresh token expires).
 
 ### Google Drive Files (`list`, `describe`, `get`, `upload`, `revisions`, `comments`)
 
@@ -381,9 +397,12 @@ Issues and pull requests are welcome! Before opening a pull request:
 
 ## Troubleshooting
 
-- **`authentication required: credentials file not found`:** Run `drivectl auth login --secret-file /path/to/client_secret.json` once to initialize `~/.config/drivectl/credentials.json` and `token.json`.
-- **Browser does not open on a remote or SSH host:** Pass `--no-browser-auth` to `drivectl auth login` and open the printed authorization URL on your local machine.
-- **`403 Forbidden: Google Docs/Sheets API has not been used in project`:** Enable the corresponding API (`drive.googleapis.com`, `docs.googleapis.com`, `sheets.googleapis.com`) in the Google Cloud Console for the project that owns your OAuth client ID.
+- **`client secret file not found` / `unable to read client secret file`:** Run `drivectl auth login --secret-file /path/to/client_secret.json` (or set `DRIVE_SECRETS=/path/to/client_secret.json`) once to initialize `~/.config/drivectl/client_secret.json` and `~/.config/drivectl/token.json`.
+- **`unable to parse client secret file to config`:** Ensure your JSON file is an **OAuth 2.0 Desktop app** client secret (`{"installed": {...}}`), not a Service Account key (`{"type": "service_account", ...}`) or API key.
+- **`Error 403: access_denied` during browser consent:** Your Google Cloud project's OAuth consent screen is set to **External** in **Testing** mode. Open **Google Auth Platform > Audience > Test users** in the Google Cloud Console and add the Google account you are signing in with.
+- **`failed to start local server` / port `8080` already in use:** Default browser login listens on `http://localhost:8080`. Free port `8080` temporarily, or authenticate with `--no-browser-auth`.
+- **Browser does not open on a remote or SSH host:** Pass `--no-browser-auth` to `drivectl auth login`, open the printed authorization URL on your local machine, and paste the `code` query parameter from the resulting `http://localhost/?...&code=...` redirect URL into the terminal.
+- **`403 Forbidden: Google Drive/Docs/Sheets/Slides API has not been used in project`:** Enable the corresponding API (`drive.googleapis.com`, `docs.googleapis.com`, `sheets.googleapis.com`, `slides.googleapis.com`) in the Google Cloud Console for the project that owns your OAuth client ID.
 
 ## License
 
