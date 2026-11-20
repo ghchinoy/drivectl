@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -29,7 +30,10 @@ import (
 	"github.com/ghchinoy/drivectl/pkg/discovery"
 )
 
-var payloadData string
+var (
+	payloadData string
+	payloadFile string
+)
 
 var callCmd = &cobra.Command{
 	Use:     "call [service.resource.method]",
@@ -37,10 +41,13 @@ var callCmd = &cobra.Command{
 	Short:   "Call an arbitrary Google API endpoint dynamically",
 	Long: `Fetches the Google API Discovery Document for the specified service, validates
 the provided JSON payload (if any), and executes the API call dynamically.
+Use --payload for inline JSON or --payload-file <path> (or '-' for stdin) for larger bodies.
 
 Example:
   drivectl call drive.v3.files.list
   drivectl call docs.v1.documents.create --payload '{"title": "My New Doc"}'
+  drivectl call slides.v1.presentations.batchUpdate --payload-file ./requests.json
+  cat ./requests.json | drivectl call slides.v1.presentations.batchUpdate --payload-file -
 `,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -70,11 +77,9 @@ Example:
 			return ui.ErrorWithHint(err, "Double check the resource and method names against the Google API documentation.")
 		}
 
-		var parsed map[string]any
-		if payloadData != "" {
-			if err := json.Unmarshal([]byte(payloadData), &parsed); err != nil {
-				return fmt.Errorf("invalid JSON payload: %w", err)
-			}
+		parsed, err := loadCallPayload(cmd, payloadData, payloadFile)
+		if err != nil {
+			return ui.ErrorWithHint(err, "Provide valid JSON via either --payload or --payload-file (use '-' for stdin).")
 		}
 
 		req, err := discovery.BuildRequest(ctx, doc, method, parsed, false)
@@ -105,6 +110,45 @@ Example:
 	},
 }
 
+func loadCallPayload(cmd *cobra.Command, inline, filePath string) (map[string]any, error) {
+	if inline != "" && filePath != "" {
+		return nil, errors.New("cannot specify both --payload and --payload-file")
+	}
+
+	raw, err := readCallPayloadBytes(cmd, inline, filePath)
+	if err != nil {
+		return nil, err
+	}
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return nil, nil
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return nil, fmt.Errorf("invalid JSON payload: %w", err)
+	}
+	return parsed, nil
+}
+
+func readCallPayloadBytes(cmd *cobra.Command, inline, filePath string) ([]byte, error) {
+	switch {
+	case filePath == "-":
+		raw, err := io.ReadAll(cmd.InOrStdin())
+		if err != nil {
+			return nil, fmt.Errorf("reading payload from stdin: %w", err)
+		}
+		return raw, nil
+	case filePath != "":
+		raw, err := os.ReadFile(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("reading payload file %q: %w", filePath, err)
+		}
+		return raw, nil
+	default:
+		return []byte(inline), nil
+	}
+}
+
 func prettyFormatResponse(respBody []byte) string {
 	var prettyJSON bytes.Buffer
 	if err := json.Indent(&prettyJSON, respBody, "", "  "); err != nil {
@@ -116,4 +160,5 @@ func prettyFormatResponse(respBody []byte) string {
 func init() {
 	rootCmd.AddCommand(callCmd)
 	callCmd.Flags().StringVar(&payloadData, "payload", "", "JSON payload for the request (includes path parameters)")
+	callCmd.Flags().StringVar(&payloadFile, "payload-file", "", "Path to a JSON file for the request payload (use '-' for stdin)")
 }

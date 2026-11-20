@@ -53,6 +53,9 @@ drivectl upload ./metrics.csv --parent <folder-id> --mime-type text/csv -O json
 
 # Upload a local .pptx and convert directly to native Google Slides
 drivectl upload ./workshop.pptx --name "Workshop Deck" --convert slides
+
+# Update an existing file in place (preserves share URL and permissions)
+drivectl upload ./workshop.pptx --file-id <existing-id> --convert slides
 ```
 
 ## Revision history and comments (`revisions`, `comments`)

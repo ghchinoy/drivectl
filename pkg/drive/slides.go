@@ -52,6 +52,171 @@ func BatchUpdatePresentation(slidesSvc *slides.Service, presentationID string, r
 	return resp, nil
 }
 
+// SlideElementSummary describes a page element on a Google Slides slide for inspection and editing.
+type SlideElementSummary struct {
+	ObjectID string `json:"objectId"`
+	Kind     string `json:"kind"`
+	Text     string `json:"text,omitempty"`
+}
+
+// SlideSummary describes a slide's 1-based index, object ID, elements, and speaker notes metadata.
+type SlideSummary struct {
+	Index                int                   `json:"index"`
+	ObjectID             string                `json:"objectId"`
+	SpeakerNotesObjectID string                `json:"speakerNotesObjectId,omitempty"`
+	SpeakerNotes         string                `json:"speakerNotes,omitempty"`
+	Elements             []SlideElementSummary `json:"elements"`
+}
+
+// PresentationOutline is a compact structural summary of a Google Slides presentation.
+type PresentationOutline struct {
+	PresentationID string         `json:"presentationId"`
+	Title          string         `json:"title"`
+	Slides         []SlideSummary `json:"slides"`
+}
+
+// SummarizePresentation builds a compact outline of slide IDs, element IDs, text previews,
+// and speaker notes metadata from a *slides.Presentation.
+func SummarizePresentation(pres *slides.Presentation) *PresentationOutline {
+	if pres == nil {
+		return &PresentationOutline{}
+	}
+	outline := &PresentationOutline{
+		PresentationID: pres.PresentationId,
+		Title:          pres.Title,
+		Slides:         make([]SlideSummary, 0, len(pres.Slides)),
+	}
+	for idx, slide := range pres.Slides {
+		if slide == nil {
+			continue
+		}
+		outline.Slides = append(outline.Slides, summarizeSlide(idx+1, slide))
+	}
+	return outline
+}
+
+// ReplacePresentationText replaces all occurrences of find with replace across a presentation
+// and returns the number of occurrences changed.
+func ReplacePresentationText(slidesSvc *slides.Service, presentationID, find, replace string, matchCase bool) (int64, error) {
+	req := &slides.Request{
+		ReplaceAllText: &slides.ReplaceAllTextRequest{
+			ContainsText: &slides.SubstringMatchCriteria{
+				Text:      find,
+				MatchCase: matchCase,
+			},
+			ReplaceText: replace,
+		},
+	}
+	resp, err := BatchUpdatePresentation(slidesSvc, presentationID, []*slides.Request{req})
+	if err != nil {
+		return 0, err
+	}
+	var changed int64
+	for _, reply := range resp.Replies {
+		if reply != nil && reply.ReplaceAllText != nil {
+			changed += reply.ReplaceAllText.OccurrencesChanged
+		}
+	}
+	return changed, nil
+}
+
+// UpdateSlideNotes replaces the speaker notes text on the 1-based slideNum of a presentation
+// and returns the speaker notes object ID that was updated.
+func UpdateSlideNotes(slidesSvc *slides.Service, presentationID string, slideNum int, newNotes string) (string, error) {
+	pres, err := FetchPresentation(slidesSvc, presentationID)
+	if err != nil {
+		return "", err
+	}
+	if slideNum < 1 || slideNum > len(pres.Slides) {
+		return "", fmt.Errorf("slide %d out of range (presentation has %d slides)", slideNum, len(pres.Slides))
+	}
+
+	slide := pres.Slides[slideNum-1]
+	notesID := speakerNotesObjectID(slide)
+	if notesID == "" {
+		return "", fmt.Errorf("slide %d does not have a speaker notes shape", slideNum)
+	}
+
+	var reqs []*slides.Request
+	if extractSpeakerNotes(slide) != "" {
+		reqs = append(reqs, &slides.Request{
+			DeleteText: &slides.DeleteTextRequest{
+				ObjectId:  notesID,
+				TextRange: &slides.Range{Type: "ALL"},
+			},
+		})
+	}
+	if newNotes != "" {
+		reqs = append(reqs, &slides.Request{
+			InsertText: &slides.InsertTextRequest{
+				ObjectId:       notesID,
+				InsertionIndex: 0,
+				Text:           newNotes,
+			},
+		})
+	}
+	if len(reqs) > 0 {
+		if _, err := BatchUpdatePresentation(slidesSvc, presentationID, reqs); err != nil {
+			return "", err
+		}
+	}
+	return notesID, nil
+}
+
+func summarizeSlide(index int, slide *slides.Page) SlideSummary {
+	summary := SlideSummary{
+		Index:                index,
+		ObjectID:             slide.ObjectId,
+		SpeakerNotesObjectID: speakerNotesObjectID(slide),
+		SpeakerNotes:         extractSpeakerNotes(slide),
+		Elements:             make([]SlideElementSummary, 0, len(slide.PageElements)),
+	}
+	for _, elem := range slide.PageElements {
+		if elem == nil {
+			continue
+		}
+		summary.Elements = append(summary.Elements, summarizePageElement(elem))
+	}
+	return summary
+}
+
+func summarizePageElement(elem *slides.PageElement) SlideElementSummary {
+	item := SlideElementSummary{ObjectID: elem.ObjectId, Kind: elementKind(elem)}
+	if elem.Shape != nil && elem.Shape.Text != nil {
+		item.Text = strings.TrimSpace(extractTextElements(elem.Shape.Text.TextElements))
+	}
+	return item
+}
+
+func elementKind(elem *slides.PageElement) string {
+	switch {
+	case elem.Shape != nil:
+		return "shape"
+	case elem.Image != nil:
+		return "image"
+	case elem.Table != nil:
+		return "table"
+	case elem.Line != nil:
+		return "line"
+	case elem.Video != nil:
+		return "video"
+	case elem.ElementGroup != nil:
+		return "group"
+	default:
+		return "element"
+	}
+}
+
+func speakerNotesObjectID(slide *slides.Page) string {
+	if slide == nil || slide.SlideProperties == nil || slide.SlideProperties.NotesPage == nil {
+		return ""
+	}
+	if slide.SlideProperties.NotesPage.NotesProperties == nil {
+		return ""
+	}
+	return slide.SlideProperties.NotesPage.NotesProperties.SpeakerNotesObjectId
+}
+
 // FetchPresentationAsMarkdown retrieves a Google Slides presentation and renders its slide text,
 // tables, and speaker notes as structured Markdown.
 func FetchPresentationAsMarkdown(slidesSvc *slides.Service, presentationID string) (string, error) {
@@ -153,7 +318,7 @@ func extractTextElements(elements []*slides.TextElement) string {
 	var b strings.Builder
 	for _, te := range elements {
 		if te != nil && te.TextRun != nil {
-			b.WriteString(te.TextRun.Content)
+			b.WriteString(strings.ReplaceAll(te.TextRun.Content, "\x0b", "\n"))
 		}
 	}
 	return b.String()

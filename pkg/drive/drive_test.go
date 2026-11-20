@@ -412,6 +412,199 @@ func TestUploadFileWithOptions(t *testing.T) {
 	}
 }
 
+func TestUploadFileWithOptions_UpdateInPlaceAndStripExtension(t *testing.T) {
+	var methods []string
+	var paths []string
+	var bodies []string
+
+	httpClient := &http.Client{
+		Transport: fakeRoundTripper(func(req *http.Request) (*http.Response, error) {
+			methods = append(methods, req.Method)
+			paths = append(paths, req.URL.Path)
+			b, err := io.ReadAll(req.Body)
+			if err != nil {
+				return nil, err
+			}
+			bodies = append(bodies, string(b))
+			return jsonHTTPResponse(req, http.StatusOK, `{
+				"id":"slides-existing",
+				"name":"my-deck",
+				"mimeType":"application/vnd.google-apps.presentation",
+				"webViewLink":"https://docs.google.com/presentation/d/slides-existing/edit"
+			}`), nil
+		}),
+	}
+	driveSvc, err := NewDriveService(t.Context(), httpClient)
+	if err != nil {
+		t.Fatalf("NewDriveService error = %v", err)
+	}
+
+	pptxPath := filepath.Join(t.TempDir(), "my-deck.pptx")
+	if err := os.WriteFile(pptxPath, []byte("PK-v2"), 0o600); err != nil {
+		t.Fatalf("os.WriteFile(%q) error = %v", pptxPath, err)
+	}
+
+	// 1. Convert with no explicit name strips .pptx extension.
+	_, err = UploadFileWithOptions(driveSvc, pptxPath, UploadOptions{
+		MimeType: "application/vnd.google-apps.presentation",
+	})
+	if err != nil {
+		t.Fatalf("UploadFileWithOptions create convert error = %v", err)
+	}
+	if !strings.Contains(bodies[0], `"name":"my-deck"`) {
+		t.Errorf("converted upload without Name should strip .pptx; body:\n%s", bodies[0])
+	}
+
+	// 2. Update in place with FileID uses PATCH to /files/{fileID}.
+	got, err := UploadFileWithOptions(driveSvc, pptxPath, UploadOptions{
+		FileID:   "slides-existing",
+		MimeType: "application/vnd.google-apps.presentation",
+	})
+	if err != nil {
+		t.Fatalf("UploadFileWithOptions update error = %v", err)
+	}
+	if got.Id != "slides-existing" {
+		t.Errorf("updated Id = %q, want slides-existing", got.Id)
+	}
+	if methods[1] != http.MethodPatch || !strings.Contains(paths[1], "/files/slides-existing") {
+		t.Errorf("in-place update used %s %s, want PATCH .../files/slides-existing", methods[1], paths[1])
+	}
+	if !strings.Contains(bodies[1], "Content-Type: application/vnd.openxmlformats-officedocument.presentationml.presentation") {
+		t.Errorf("in-place update missing source Content-Type header; body:\n%s", bodies[1])
+	}
+}
+
+func TestRenderPresentationAsMarkdown_SoftLineBreaks(t *testing.T) {
+	pres := &slides.Presentation{
+		Title: "Soft Breaks",
+		Slides: []*slides.Page{
+			{
+				ObjectId: "s1",
+				PageElements: []*slides.PageElement{
+					{
+						ObjectId: "el1",
+						Shape: &slides.Shape{
+							Text: &slides.TextContent{
+								TextElements: []*slides.TextElement{
+									{TextRun: &slides.TextRun{Content: "Line One\x0bLine Two\n"}},
+								},
+							},
+						},
+					},
+					{
+						ObjectId: "tbl1",
+						Table: &slides.Table{
+							TableRows: []*slides.TableRow{
+								{
+									TableCells: []*slides.TableCell{
+										{
+											Text: &slides.TextContent{
+												TextElements: []*slides.TextElement{
+													{TextRun: &slides.TextRun{Content: "Cell A\x0bWrapped\n"}},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	got := RenderPresentationAsMarkdown(pres)
+	want := "# Soft Breaks\n\n## Slide 1\n\nLine One\nLine Two\n| Cell A Wrapped |\n\n"
+	if got != want {
+		t.Errorf("RenderPresentationAsMarkdown soft breaks = %q, want %q", got, want)
+	}
+}
+
+func TestSlidesInspectReplaceAndNotes(t *testing.T) {
+	var batchBodies []string
+	httpClient := &http.Client{
+		Transport: fakeRoundTripper(func(req *http.Request) (*http.Response, error) {
+			switch {
+			case req.Method == http.MethodGet && req.URL.Path == "/v1/presentations/p1":
+				return jsonHTTPResponse(req, http.StatusOK, `{
+					"presentationId":"p1",
+					"title":"Workshop",
+					"slides":[
+						{
+							"objectId":"slide-1",
+							"pageElements":[
+								{"objectId":"title-1","shape":{"text":{"textElements":[{"textRun":{"content":"Hello\u000bWorld\n"}}]}} },
+								{"objectId":"img-1","image":{"contentUrl":"https://example.com/a.png"}}
+							],
+							"slideProperties":{"notesPage":{
+								"notesProperties":{"speakerNotesObjectId":"notes-1"},
+								"pageElements":[{"objectId":"notes-1","shape":{"text":{"textElements":[{"textRun":{"content":"Old note\n"}}]}}}]
+							}}
+						},
+						{
+							"objectId":"slide-2",
+							"pageElements":[],
+							"slideProperties":{"notesPage":{
+								"notesProperties":{"speakerNotesObjectId":"notes-2"},
+								"pageElements":[{"objectId":"notes-2","shape":{"text":{"textElements":[]}}}]
+							}}
+						}
+					]
+				}`), nil
+			case req.Method == http.MethodPost && req.URL.Path == "/v1/presentations/p1:batchUpdate":
+				b, _ := io.ReadAll(req.Body)
+				batchBodies = append(batchBodies, string(b))
+				return jsonHTTPResponse(req, http.StatusOK, `{"presentationId":"p1","replies":[{"replaceAllText":{"occurrencesChanged":3}}]}`), nil
+			default:
+				return jsonHTTPResponse(req, http.StatusNotFound, `{"error":"not found"}`), nil
+			}
+		}),
+	}
+	slidesSvc, err := NewSlidesService(t.Context(), httpClient)
+	if err != nil {
+		t.Fatalf("NewSlidesService error = %v", err)
+	}
+
+	pres, err := FetchPresentation(slidesSvc, "p1")
+	if err != nil {
+		t.Fatalf("FetchPresentation error = %v", err)
+	}
+	outline := SummarizePresentation(pres)
+	if len(outline.Slides) != 2 || outline.Slides[0].SpeakerNotesObjectID != "notes-1" {
+		t.Fatalf("SummarizePresentation = %+v, want 2 slides with notes-1", outline)
+	}
+	if len(outline.Slides[0].Elements) != 2 || outline.Slides[0].Elements[0].Text != "Hello\nWorld" || outline.Slides[0].Elements[1].Kind != "image" {
+		t.Errorf("Slide 1 elements = %+v, want Hello\\nWorld shape and image", outline.Slides[0].Elements)
+	}
+
+	changed, err := ReplacePresentationText(slidesSvc, "p1", "Old", "New", true)
+	if err != nil {
+		t.Fatalf("ReplacePresentationText error = %v", err)
+	}
+	if changed != 3 {
+		t.Errorf("ReplacePresentationText changed = %d, want 3", changed)
+	}
+
+	// Updating non-empty notes sends deleteText + insertText.
+	notesID, err := UpdateSlideNotes(slidesSvc, "p1", 1, "Updated note")
+	if err != nil {
+		t.Fatalf("UpdateSlideNotes(slide 1) error = %v", err)
+	}
+	if notesID != "notes-1" || !strings.Contains(batchBodies[1], `"deleteText"`) || !strings.Contains(batchBodies[1], `"Updated note"`) {
+		t.Errorf("UpdateSlideNotes(slide 1) notesID=%q body=%s", notesID, batchBodies[1])
+	}
+
+	// Updating empty notes omits deleteText (Slides API rejects deleteText on empty shapes).
+	notesID2, err := UpdateSlideNotes(slidesSvc, "p1", 2, "Brand new note")
+	if err != nil {
+		t.Fatalf("UpdateSlideNotes(slide 2) error = %v", err)
+	}
+	if notesID2 != "notes-2" || strings.Contains(batchBodies[2], `"deleteText"`) || !strings.Contains(batchBodies[2], `"Brand new note"`) {
+		t.Errorf("UpdateSlideNotes(slide 2) notesID=%q body=%s", notesID2, batchBodies[2])
+	}
+}
+
 type fakeRoundTripper func(*http.Request) (*http.Response, error)
 
 func (f fakeRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {

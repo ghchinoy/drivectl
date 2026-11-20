@@ -36,6 +36,10 @@ drivectl call drive.v3.permissions.create \
 drivectl call docs.v1.documents.create \
   --payload '{"title": "Q4 Architecture Review"}' \
   -O json
+
+# Pass a large JSON payload from a file or stdin ('-')
+drivectl call slides.v1.presentations.batchUpdate --payload-file ./batch.json
+cat ./batch.json | drivectl call slides.v1.presentations.batchUpdate --payload-file -
 ```
 
 :::caution[Silent Permission Grants & ACL Safety]

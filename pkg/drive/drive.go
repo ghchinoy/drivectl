@@ -149,7 +149,10 @@ func CreateDocFromMarkdown(docsSvc *docs.Service, title, markdownContent string)
 
 // UploadOptions configures optional metadata for uploading a local file to Google Drive.
 type UploadOptions struct {
-	// Name overrides the remote file name in Google Drive (defaults to the local file's base name).
+	// FileID, when non-empty, updates an existing Google Drive file in place instead of creating a new one.
+	FileID string
+	// Name overrides the remote file name in Google Drive (defaults to the local file's base name,
+	// with its extension stripped when converting into a native Google Workspace format).
 	Name string
 	// ParentID places the uploaded file inside the specified Drive folder ID.
 	ParentID string
@@ -189,7 +192,8 @@ func UploadFile(driveSvc *drive.Service, filePath, parentID string) (*drive.File
 }
 
 // UploadFileWithOptions uploads a local file to Google Drive with optional name, parent folder,
-// and target MIME type (enabling automatic conversion to native Google Workspace formats).
+// target MIME type (enabling automatic conversion to native Google Workspace formats), or
+// an existing FileID for in-place content replacement.
 func UploadFileWithOptions(driveSvc *drive.Service, filePath string, opts UploadOptions) (*drive.File, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -197,9 +201,32 @@ func UploadFileWithOptions(driveSvc *drive.Service, filePath string, opts Upload
 	}
 	defer file.Close()
 
+	var mediaOpts []googleapi.MediaOption
+	if srcMime := detectSourceMimeType(filePath); srcMime != "" {
+		mediaOpts = append(mediaOpts, googleapi.ContentType(srcMime))
+	}
+
+	if opts.FileID != "" {
+		meta := &drive.File{
+			Name:     opts.Name,
+			MimeType: opts.MimeType,
+		}
+		call := driveSvc.Files.Update(opts.FileID, meta).
+			Media(file, mediaOpts...).
+			Fields("id, name, mimeType, webViewLink")
+		if opts.ParentID != "" {
+			call = call.AddParents(opts.ParentID)
+		}
+		updatedFile, err := call.Do()
+		if err != nil {
+			return nil, fmt.Errorf("unable to update file %q: %w", opts.FileID, err)
+		}
+		return updatedFile, nil
+	}
+
 	fileName := opts.Name
 	if fileName == "" {
-		fileName = filepath.Base(filePath)
+		fileName = defaultUploadName(filePath, opts.MimeType)
 	}
 	meta := &drive.File{
 		Name:     fileName,
@@ -207,11 +234,6 @@ func UploadFileWithOptions(driveSvc *drive.Service, filePath string, opts Upload
 	}
 	if opts.ParentID != "" {
 		meta.Parents = []string{opts.ParentID}
-	}
-
-	var mediaOpts []googleapi.MediaOption
-	if srcMime := detectSourceMimeType(filePath); srcMime != "" {
-		mediaOpts = append(mediaOpts, googleapi.ContentType(srcMime))
 	}
 
 	uploadedFile, err := driveSvc.Files.Create(meta).
@@ -222,6 +244,17 @@ func UploadFileWithOptions(driveSvc *drive.Service, filePath string, opts Upload
 		return nil, fmt.Errorf("unable to create file %q: %w", fileName, err)
 	}
 	return uploadedFile, nil
+}
+
+func defaultUploadName(filePath, targetMime string) string {
+	base := filepath.Base(filePath)
+	if !strings.HasPrefix(targetMime, "application/vnd.google-apps.") {
+		return base
+	}
+	if ext := filepath.Ext(base); ext != "" && len(ext) < len(base) {
+		return strings.TrimSuffix(base, ext)
+	}
+	return base
 }
 
 func detectSourceMimeType(filePath string) string {

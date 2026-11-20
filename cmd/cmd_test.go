@@ -45,9 +45,20 @@ func TestCLICommands(t *testing.T) {
 		t.Fatalf("os.WriteFile(%q) error = %v", recipeFile, err)
 	}
 
+	payloadJSONFile := filepath.Join(t.TempDir(), "payload.json")
+	if err := os.WriteFile(payloadJSONFile, []byte(`{"pageSize":3}`), 0o600); err != nil {
+		t.Fatalf("os.WriteFile(%q) error = %v", payloadJSONFile, err)
+	}
+
+	notesFile := filepath.Join(t.TempDir(), "notes.txt")
+	if err := os.WriteFile(notesFile, []byte("Updated notes from file"), 0o600); err != nil {
+		t.Fatalf("os.WriteFile(%q) error = %v", notesFile, err)
+	}
+
 	tests := []struct {
 		name    string
 		args    []string
+		stdin   string
 		wantErr bool
 	}{
 		{
@@ -115,12 +126,50 @@ func TestCLICommands(t *testing.T) {
 			args: []string{"slides", "create", "DevFest Deck", "-O", "json"},
 		},
 		{
+			name: "slides_inspect",
+			args: []string{"slides", "inspect", "pres1"},
+		},
+		{
+			name: "slides_inspect_slide_json",
+			args: []string{"slides", "inspect", "pres1", "--slide", "1", "-O", "json"},
+		},
+		{
+			name:    "slides_inspect_out_of_range",
+			args:    []string{"slides", "inspect", "pres1", "--slide", "99"},
+			wantErr: true,
+		},
+		{
+			name: "slides_replace_json",
+			args: []string{"slides", "replace", "pres1", "Old", "New", "--match-case", "-O", "json"},
+		},
+		{
+			name: "slides_notes_read",
+			args: []string{"slides", "notes", "pres1", "--slide", "1"},
+		},
+		{
+			name: "slides_notes_set",
+			args: []string{"slides", "notes", "pres1", "--slide", "1", "--set", "Hello room!"},
+		},
+		{
+			name: "slides_notes_file_json",
+			args: []string{"slides", "notes", "pres1", "--slide", "1", "--file", notesFile, "-O", "json"},
+		},
+		{
+			name:    "slides_notes_conflict",
+			args:    []string{"slides", "notes", "pres1", "--slide", "1", "--set", "A", "--file", notesFile},
+			wantErr: true,
+		},
+		{
 			name: "upload_file",
 			args: []string{"upload", mdFile},
 		},
 		{
 			name: "upload_convert_slides",
 			args: []string{"upload", mdFile, "--name", "Portfolio Deck", "--convert", "slides"},
+		},
+		{
+			name: "upload_update_in_place",
+			args: []string{"upload", mdFile, "--file-id", "f1", "--convert", "slides"},
 		},
 		{
 			name:    "upload_convert_and_mime_type_conflict",
@@ -137,6 +186,20 @@ func TestCLICommands(t *testing.T) {
 			args: []string{"call", "drive.v3.files.list", "--payload", `{"pageSize":2}`},
 		},
 		{
+			name: "call_payload_file",
+			args: []string{"call", "drive.v3.files.list", "--payload-file", payloadJSONFile},
+		},
+		{
+			name:  "call_payload_stdin",
+			args:  []string{"call", "drive.v3.files.list", "--payload-file", "-"},
+			stdin: `{"pageSize":4}`,
+		},
+		{
+			name:    "call_payload_and_file_conflict",
+			args:    []string{"call", "drive.v3.files.list", "--payload", `{}`, "--payload-file", payloadJSONFile},
+			wantErr: true,
+		},
+		{
 			name:    "call_invalid_endpoint_format",
 			args:    []string{"call", "invalid-format"},
 			wantErr: true,
@@ -151,14 +214,32 @@ func TestCLICommands(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			OutputFormat = ""
 			payloadData = ""
+			payloadFile = ""
 			outputFile = ""
 			format = ""
 			tabID = ""
 			parentID = ""
+			uploadFileID = ""
 			uploadName = ""
 			uploadMimeType = ""
 			uploadConvert = ""
+			slidesInspectSlide = 0
+			slidesMatchCase = false
+			slidesNotesSlide = 0
+			slidesNotesSet = ""
+			slidesNotesFile = ""
+			if f := slidesNotesCmd.Flags().Lookup("set"); f != nil {
+				f.Changed = false
+			}
+			if f := slidesNotesCmd.Flags().Lookup("file"); f != nil {
+				f.Changed = false
+			}
 
+			if tc.stdin != "" {
+				rootCmd.SetIn(strings.NewReader(tc.stdin))
+			} else {
+				rootCmd.SetIn(strings.NewReader(""))
+			}
 			rootCmd.SetArgs(tc.args)
 			err := ExecuteContext(ctx)
 			if (err != nil) != tc.wantErr {
@@ -216,6 +297,8 @@ func newFakeCmdHTTPClient() *http.Client {
 				return cmdJSONResp(req, http.StatusOK, `{"id":"f1","name":"Notes.txt","mimeType":"text/plain"}`), nil
 			case req.Method == http.MethodPost && strings.Contains(path, "/drive/v3/files"):
 				return cmdJSONResp(req, http.StatusOK, `{"id":"up1","name":"doc.md"}`), nil
+			case req.Method == http.MethodPatch && strings.Contains(path, "/drive/v3/files/f1"):
+				return cmdJSONResp(req, http.StatusOK, `{"id":"f1","name":"doc","webViewLink":"https://docs.google.com/presentation/d/f1/edit"}`), nil
 			case req.Method == http.MethodGet && path == "/drive/v3/files/f1/comments":
 				return cmdJSONResp(req, http.StatusOK, `{"comments":[{"id":"c1","content":"Great","author":{"displayName":"Bob"},"replies":[{"content":"Thanks","author":{"displayName":"Alice"}}]}]}`), nil
 			case req.Method == http.MethodGet && path == "/drive/v3/files/f1/revisions":
@@ -233,7 +316,20 @@ func newFakeCmdHTTPClient() *http.Client {
 			case req.Method == http.MethodPut && strings.HasPrefix(path, "/v4/spreadsheets/sp1/values/"):
 				return cmdJSONResp(req, http.StatusOK, `{"updatedCells":1}`), nil
 			case req.Method == http.MethodGet && path == "/v1/presentations/pres1":
-				return cmdJSONResp(req, http.StatusOK, `{"presentationId":"pres1","title":"Workshop Deck","slides":[{"objectId":"s1"}]}`), nil
+				return cmdJSONResp(req, http.StatusOK, `{
+					"presentationId":"pres1",
+					"title":"Workshop Deck",
+					"slides":[{
+						"objectId":"s1",
+						"pageElements":[{"objectId":"t1","shape":{"text":{"textElements":[{"textRun":{"content":"Hello\n"}}]}} }],
+						"slideProperties":{"notesPage":{
+							"notesProperties":{"speakerNotesObjectId":"notes1"},
+							"pageElements":[{"objectId":"notes1","shape":{"text":{"textElements":[{"textRun":{"content":"Speaker cue\n"}}]}}}]
+						}}
+					}]
+				}`), nil
+			case req.Method == http.MethodPost && path == "/v1/presentations/pres1:batchUpdate":
+				return cmdJSONResp(req, http.StatusOK, `{"presentationId":"pres1","replies":[{"replaceAllText":{"occurrencesChanged":2}}]}`), nil
 			case req.Method == http.MethodPost && path == "/v1/presentations":
 				return cmdJSONResp(req, http.StatusOK, `{"presentationId":"pres-new","title":"DevFest Deck"}`), nil
 			default:

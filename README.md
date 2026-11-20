@@ -112,7 +112,7 @@ Once installed and provided with a Desktop OAuth `client_secret.json` (see [Gett
 | `drivectl list` | `workspace` | List and search files in Google Drive |
 | `drivectl describe <file-id>` | `workspace` | Fetch detailed metadata for a Drive file |
 | `drivectl get <file-id>` | `workspace` | Download a file or export a Google Doc (`raw`, `txt`, `md`, `pdf`) |
-| `drivectl upload <local-path>` | `workspace` | Upload a local file to Google Drive (with optional `--convert slides\|docs\|sheets`) |
+| `drivectl upload <local-path>` | `workspace` | Upload a local file (with optional `--file-id` in-place update or `--convert slides\|docs\|sheets`) |
 | `drivectl revisions <file-id>` | `workspace` | List the revision history of a file |
 | `drivectl comments <file-id>` | `workspace` | List threaded comments and replies on a file |
 | `drivectl docs create <title> [md]` | `workspace` | Create a Google Doc (optionally converting a local Markdown file) |
@@ -122,6 +122,9 @@ Once installed and provided with a Desktop OAuth `client_secret.json` (see [Gett
 | `drivectl sheets update-range <id> <val>` | `workspace` | Write a value to an A1 range |
 | `drivectl slides get <pres-id>` | `workspace` | Render a Google Slides presentation (slides, tables, notes) as Markdown or JSON |
 | `drivectl slides create <title>` | `workspace` | Create a new Google Slides presentation via the Slides API |
+| `drivectl slides inspect <pres-id>` | `workspace` | List slide IDs, element objectIds, text previews, and speaker notes IDs |
+| `drivectl slides replace <id> <old> <new>` | `workspace` | Replace all matching text occurrences across a presentation |
+| `drivectl slides notes <id> --slide N` | `workspace` | Read or update (`--set` / `--file`) speaker notes on a slide |
 | `drivectl call <api.ver.res.method>` | `api` | Dynamically invoke any Google REST endpoint via Discovery |
 | `drivectl run <recipe.json>` | `api` | Execute a sequence of `drivectl` commands from a JSON recipe |
 | `drivectl --mcp` / `--mcp-http :8080` | root flags | Run `drivectl` as an MCP server over stdio or HTTP |
@@ -183,6 +186,9 @@ DRIVE_SECRETS=/path/to/client_secret.json ./drivectl auth login
 
 # Upload a local .pptx and convert it directly into a native Google Slides presentation
 ./drivectl upload ./deck.pptx --name "DevFest 2026 Workshop" --convert slides
+
+# Update an existing Google Slides deck in place (preserves URL and sharing permissions)
+./drivectl upload ./deck.pptx --file-id <existing-id> --convert slides
 ```
 
 #### View file revisions and comments
@@ -233,8 +239,19 @@ DRIVE_SECRETS=/path/to/client_secret.json ./drivectl auth login
 # Render slides, tables, and speaker notes as Markdown
 ./drivectl slides get <presentation-id>
 
-# Or upload a local .pptx and convert directly into native Google Slides
+# Inspect slide IDs, element objectIds, text previews, and speakerNotesObjectId
+./drivectl slides inspect <presentation-id> --slide 3
+
+# Replace text across all slides
+./drivectl slides replace <presentation-id> "Speaker Name" "G. Hussain Chinoy" --match-case
+
+# Read or update speaker notes on a specific slide
+./drivectl slides notes <presentation-id> --slide 1
+./drivectl slides notes <presentation-id> --slide 1 --set "Welcome everyone!"
+
+# Or upload a local .pptx and convert directly into native Google Slides (or update in place)
 ./drivectl upload ./deck.pptx --name "DevFest 2026 Workshop" --convert slides
+./drivectl upload ./deck.pptx --file-id <existing-id> --convert slides
 ```
 
 ### Dynamic Discovery Calls (`call`)
@@ -250,6 +267,10 @@ Use `drivectl call` to invoke any Google API endpoint described by Google's Disc
 
 # Create a new Google Doc via docs.v1.documents.create
 ./drivectl call docs.v1.documents.create --payload '{"title": "My New Document"}' -O json
+
+# Pass a large JSON body from a file or stdin (ideal for batchUpdate requests)
+./drivectl call slides.v1.presentations.batchUpdate --payload-file ./batch.json
+cat ./batch.json | ./drivectl call slides.v1.presentations.batchUpdate --payload-file -
 ```
 
 ### Automating Workflows (`run`)
