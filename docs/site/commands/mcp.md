@@ -35,7 +35,7 @@ When the server starts, it registers two tiers of tools:
    - `drive.v3.files.list`, `drive.v3.files.get`, `drive.v3.files.create`, `drive.v3.files.update`
    - `docs.v1.documents.create`, `docs.v1.documents.get`, `docs.v1.documents.batchUpdate`
    - `sheets.v4.spreadsheets.create`, `sheets.v4.spreadsheets.get`, `sheets.v4.spreadsheets.values.get`, `sheets.v4.spreadsheets.values.update`
-   - `slides.v1.presentations.get`
+   - `slides.v1.presentations.create`, `slides.v1.presentations.get`, `slides.v1.presentations.batchUpdate`
 
 ## Embed in another Go MCP server
 

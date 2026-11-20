@@ -144,23 +144,72 @@ func CreateDocFromMarkdown(docsSvc *docs.Service, title, markdownContent string)
 	return createdDoc, nil
 }
 
+// UploadOptions configures optional metadata for uploading a local file to Google Drive.
+type UploadOptions struct {
+	// Name overrides the remote file name in Google Drive (defaults to the local file's base name).
+	Name string
+	// ParentID places the uploaded file inside the specified Drive folder ID.
+	ParentID string
+	// MimeType sets the target MIME type in Google Drive metadata. Setting a Google Workspace
+	// MIME type (such as application/vnd.google-apps.presentation) instructs Drive to convert
+	// the uploaded file into a native Google Workspace file.
+	MimeType string
+}
+
+var convertMimeMap = map[string]string{
+	"slides":       "application/vnd.google-apps.presentation",
+	"presentation": "application/vnd.google-apps.presentation",
+	"docs":         "application/vnd.google-apps.document",
+	"doc":          "application/vnd.google-apps.document",
+	"document":     "application/vnd.google-apps.document",
+	"sheets":       "application/vnd.google-apps.spreadsheet",
+	"sheet":        "application/vnd.google-apps.spreadsheet",
+	"spreadsheet":  "application/vnd.google-apps.spreadsheet",
+}
+
+// ResolveConvertMimeType resolves a friendly Google Workspace conversion target
+// (such as "slides", "docs", or "sheets") to its Google Drive MIME type.
+func ResolveConvertMimeType(target string) (string, error) {
+	key := strings.ToLower(strings.TrimSpace(target))
+	if key == "" {
+		return "", nil
+	}
+	if mimeType, ok := convertMimeMap[key]; ok {
+		return mimeType, nil
+	}
+	return "", fmt.Errorf("invalid convert target %q (valid targets: slides, docs, sheets)", target)
+}
+
 // UploadFile uploads a local file to Google Drive.
 func UploadFile(driveSvc *drive.Service, filePath, parentID string) (*drive.File, error) {
+	return UploadFileWithOptions(driveSvc, filePath, UploadOptions{ParentID: parentID})
+}
+
+// UploadFileWithOptions uploads a local file to Google Drive with optional name, parent folder,
+// and target MIME type (enabling automatic conversion to native Google Workspace formats).
+func UploadFileWithOptions(driveSvc *drive.Service, filePath string, opts UploadOptions) (*drive.File, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to open file %q: %w", filePath, err)
 	}
 	defer file.Close()
 
-	fileName := filepath.Base(filePath)
-	meta := &drive.File{
-		Name: fileName,
+	fileName := opts.Name
+	if fileName == "" {
+		fileName = filepath.Base(filePath)
 	}
-	if parentID != "" {
-		meta.Parents = []string{parentID}
+	meta := &drive.File{
+		Name:     fileName,
+		MimeType: opts.MimeType,
+	}
+	if opts.ParentID != "" {
+		meta.Parents = []string{opts.ParentID}
 	}
 
-	uploadedFile, err := driveSvc.Files.Create(meta).Media(file).Do()
+	uploadedFile, err := driveSvc.Files.Create(meta).
+		Media(file).
+		Fields("id, name, mimeType, webViewLink").
+		Do()
 	if err != nil {
 		return nil, fmt.Errorf("unable to create file %q: %w", fileName, err)
 	}

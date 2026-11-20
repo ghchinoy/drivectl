@@ -99,8 +99,38 @@ func TestCLICommands(t *testing.T) {
 			args: []string{"sheets", "update-range", "sp1", "Done", "--sheet", "Sheet1", "--range", "B2"},
 		},
 		{
+			name: "slides_get",
+			args: []string{"slides", "get", "pres1"},
+		},
+		{
+			name: "slides_get_json",
+			args: []string{"slides", "get", "pres1", "-O", "json"},
+		},
+		{
+			name: "slides_create",
+			args: []string{"slides", "create", "DevFest Deck"},
+		},
+		{
+			name: "slides_create_json",
+			args: []string{"slides", "create", "DevFest Deck", "-O", "json"},
+		},
+		{
 			name: "upload_file",
 			args: []string{"upload", mdFile},
+		},
+		{
+			name: "upload_convert_slides",
+			args: []string{"upload", mdFile, "--name", "Portfolio Deck", "--convert", "slides"},
+		},
+		{
+			name:    "upload_convert_and_mime_type_conflict",
+			args:    []string{"upload", mdFile, "--convert", "slides", "--mime-type", "text/plain"},
+			wantErr: true,
+		},
+		{
+			name:    "upload_convert_invalid",
+			args:    []string{"upload", mdFile, "--convert", "unknown"},
+			wantErr: true,
 		},
 		{
 			name: "call_dynamic_endpoint",
@@ -124,6 +154,10 @@ func TestCLICommands(t *testing.T) {
 			outputFile = ""
 			format = ""
 			tabID = ""
+			parentID = ""
+			uploadName = ""
+			uploadMimeType = ""
+			uploadConvert = ""
 
 			rootCmd.SetArgs(tc.args)
 			err := ExecuteContext(ctx)
@@ -198,6 +232,10 @@ func newFakeCmdHTTPClient() *http.Client {
 				return cmdJSONResp(req, http.StatusOK, `{"values":[["Col1","Col2"],["Val1","Val2"]]}`), nil
 			case req.Method == http.MethodPut && strings.HasPrefix(path, "/v4/spreadsheets/sp1/values/"):
 				return cmdJSONResp(req, http.StatusOK, `{"updatedCells":1}`), nil
+			case req.Method == http.MethodGet && path == "/v1/presentations/pres1":
+				return cmdJSONResp(req, http.StatusOK, `{"presentationId":"pres1","title":"Workshop Deck","slides":[{"objectId":"s1"}]}`), nil
+			case req.Method == http.MethodPost && path == "/v1/presentations":
+				return cmdJSONResp(req, http.StatusOK, `{"presentationId":"pres-new","title":"DevFest Deck"}`), nil
 			default:
 				return cmdJSONResp(req, http.StatusNotFound, `{"error":"not found"}`), nil
 			}

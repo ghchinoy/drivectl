@@ -45,6 +45,10 @@ func TestRegisterTools_EmbeddableAndDynamicTools(t *testing.T) {
 				return newJSONResp(req, http.StatusOK, `{"documentId":"doc-42","title":"Quarterly Plan"}`), nil
 			case req.Method == http.MethodGet && req.URL.Path == "/v1/presentations/pres-99":
 				return newJSONResp(req, http.StatusOK, `{"presentationId":"pres-99","title":"Deck"}`), nil
+			case req.Method == http.MethodPost && req.URL.Path == "/v1/presentations":
+				return newJSONResp(req, http.StatusOK, `{"presentationId":"pres-new","title":"DevFest Deck"}`), nil
+			case req.Method == http.MethodPost && req.URL.Path == "/v1/presentations/pres-new:batchUpdate":
+				return newJSONResp(req, http.StatusOK, `{"presentationId":"pres-new","replies":[]}`), nil
 			default:
 				return newJSONResp(req, http.StatusNotFound, `{"error":"not found"}`), nil
 			}
@@ -131,6 +135,33 @@ func TestRegisterTools_EmbeddableAndDynamicTools(t *testing.T) {
 	}
 	if slidesCallRes.IsError {
 		t.Fatalf("clientSession.CallTool(ctx, \"slides.v1.presentations.get\") returned IsError=true: %+v", slidesCallRes.Content)
+	}
+
+	slidesCreateRes, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Name: "slides.v1.presentations.create",
+		Arguments: map[string]any{
+			"payload": map[string]any{"title": "DevFest Deck"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("clientSession.CallTool(ctx, \"slides.v1.presentations.create\") error = %v", err)
+	}
+	if slidesCreateRes.IsError {
+		t.Fatalf("clientSession.CallTool(ctx, \"slides.v1.presentations.create\") returned IsError=true: %+v", slidesCreateRes.Content)
+	}
+
+	slidesBatchRes, err := clientSession.CallTool(ctx, &mcp.CallToolParams{
+		Name: "slides.v1.presentations.batchUpdate",
+		Arguments: map[string]any{
+			"presentationId": "pres-new",
+			"payload":        map[string]any{"requests": []any{}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("clientSession.CallTool(ctx, \"slides.v1.presentations.batchUpdate\") error = %v", err)
+	}
+	if slidesBatchRes.IsError {
+		t.Fatalf("clientSession.CallTool(ctx, \"slides.v1.presentations.batchUpdate\") returned IsError=true: %+v", slidesBatchRes.Content)
 	}
 }
 
@@ -339,11 +370,24 @@ const fakeSlidesDiscoveryJSON = `{
         "presentationId": {"type": "string"},
         "title": {"type": "string"}
       }
+    },
+    "BatchUpdatePresentationRequest": {
+      "id": "BatchUpdatePresentationRequest",
+      "type": "object",
+      "properties": {
+        "requests": {"type": "array", "items": {"type": "object"}}
+      }
     }
   },
   "resources": {
     "presentations": {
       "methods": {
+        "create": {
+          "id": "slides.presentations.create",
+          "httpMethod": "POST",
+          "path": "v1/presentations",
+          "request": {"$ref": "Presentation"}
+        },
         "get": {
           "id": "slides.presentations.get",
           "httpMethod": "GET",
@@ -351,6 +395,15 @@ const fakeSlidesDiscoveryJSON = `{
           "parameters": {
             "presentationId": {"type": "string", "location": "path", "required": true}
           }
+        },
+        "batchUpdate": {
+          "id": "slides.presentations.batchUpdate",
+          "httpMethod": "POST",
+          "path": "v1/presentations/{presentationId}:batchUpdate",
+          "parameters": {
+            "presentationId": {"type": "string", "location": "path", "required": true}
+          },
+          "request": {"$ref": "BatchUpdatePresentationRequest"}
         }
       }
     }

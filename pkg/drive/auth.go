@@ -155,7 +155,7 @@ func NewOAuthClient(ctx context.Context, secretFile string, noBrowserAuth bool) 
 		drive.DriveReadonlyScope,
 		docs.DocumentsReadonlyScope,
 		sheets.SpreadsheetsScope,
-		slides.PresentationsReadonlyScope,
+		slides.PresentationsScope,
 		drive.DriveFileScope,
 	)
 	if err != nil {

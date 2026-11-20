@@ -19,6 +19,10 @@ Purpose-built subcommands for common Google Workspace file and document operatio
 
   Export sheets to CSV, read cell values via A1 notation, and update cells from the command line.
 
+- [Google Slides](/drivectl/commands/slides) `slides get · slides create · upload --convert slides`
+
+  Render presentations (slides, tables, and speaker notes) as Markdown, create decks via the Slides API, or upload `.pptx` decks with automatic Google Slides conversion.
+
 ## Dynamic API & automation
 
 Call any Google Workspace REST method or chain commands into repeatable workflows.

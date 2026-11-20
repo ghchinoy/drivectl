@@ -54,6 +54,7 @@ export default defineConfig({
           { label: 'Google Drive', slug: 'commands/drive' },
           { label: 'Google Docs', slug: 'commands/docs' },
           { label: 'Google Sheets', slug: 'commands/sheets' },
+          { label: 'Google Slides', slug: 'commands/slides' },
           { label: 'Dynamic Discovery & recipes', slug: 'commands/discovery' },
           { label: 'MCP server & Agent Skill', slug: 'commands/mcp' },
         ],
@@ -71,7 +72,7 @@ export default defineConfig({
     '/docs/getting-started': '/drivectl/getting-started',
     '/docs/architecture': '/drivectl/architecture',
     '/docs/commands': '/drivectl/commands',
-    ...Object.fromEntries(['drive', 'docs', 'sheets', 'discovery', 'mcp'].map(cmd => [`/docs/commands/${cmd}`, `/drivectl/commands/${cmd}`])),
+    ...Object.fromEntries(['drive', 'docs', 'sheets', 'slides', 'discovery', 'mcp'].map(cmd => [`/docs/commands/${cmd}`, `/drivectl/commands/${cmd}`])),
   },
 
   fonts: [

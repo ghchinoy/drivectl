@@ -24,21 +24,38 @@ import (
 	"github.com/ghchinoy/drivectl/pkg/drive"
 )
 
-var parentID string
+var (
+	parentID       string
+	uploadName     string
+	uploadMimeType string
+	uploadConvert  string
+)
 
 var uploadCmd = &cobra.Command{
 	Use:     "upload [file]",
 	GroupID: GroupCore,
 	Short:   "Uploads a local file to Google Drive.",
 	Long: `Uploads a file from your local filesystem to Google Drive.
-Optionally, specify a parent folder ID to upload the file to a specific folder.`,
+Optionally specify a remote --name, a --parent folder ID, an explicit --mime-type,
+or --convert (slides, docs, sheets) to convert the file into a native Google Workspace format on upload.`,
 	Example: `  drivectl upload path/to/my/file.txt
-  drivectl upload path/to/my/file.txt --parent <folder-id>`,
+  drivectl upload ./report.pdf --name "Q3 Report.pdf" --parent <folder-id>
+  drivectl upload ./deck.pptx --name "Workshop Deck" --convert slides`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
 		filePath := args[0]
 
-		uploadedFile, err := drive.UploadFile(driveSvc, filePath, parentID)
+		targetMime, err := resolveUploadMimeType(uploadMimeType, uploadConvert)
+		if err != nil {
+			return ui.ErrorWithHint(err, "Specify either --convert (slides, docs, sheets) or --mime-type, not both.")
+		}
+
+		opts := drive.UploadOptions{
+			Name:     uploadName,
+			ParentID: parentID,
+			MimeType: targetMime,
+		}
+		uploadedFile, err := drive.UploadFileWithOptions(driveSvc, filePath, opts)
 		if err != nil {
 			return ui.ErrorWithHint(err, "Ensure the file path is correct and you have permission to upload.")
 		}
@@ -52,12 +69,29 @@ Optionally, specify a parent folder ID to upload the file to a specific folder.`
 			return nil
 		}
 
+		if uploadedFile.WebViewLink != "" {
+			ui.PrintSuccess("Successfully uploaded file: %s (ID: %s) %s", uploadedFile.Name, uploadedFile.Id, uploadedFile.WebViewLink)
+			return nil
+		}
 		ui.PrintSuccess("Successfully uploaded file: %s (ID: %s)", uploadedFile.Name, uploadedFile.Id)
 		return nil
 	},
 }
 
+func resolveUploadMimeType(explicitMime, convertTarget string) (string, error) {
+	if explicitMime != "" && convertTarget != "" {
+		return "", fmt.Errorf("cannot specify both --mime-type and --convert")
+	}
+	if convertTarget != "" {
+		return drive.ResolveConvertMimeType(convertTarget)
+	}
+	return explicitMime, nil
+}
+
 func init() {
 	rootCmd.AddCommand(uploadCmd)
 	uploadCmd.Flags().StringVarP(&parentID, "parent", "p", "", "Parent folder ID to upload to")
+	uploadCmd.Flags().StringVarP(&uploadName, "name", "n", "", "Remote file name in Google Drive (defaults to local filename)")
+	uploadCmd.Flags().StringVar(&uploadMimeType, "mime-type", "", "Target MIME type in Google Drive metadata")
+	uploadCmd.Flags().StringVar(&uploadConvert, "convert", "", "Convert file on upload to a native Google Workspace format (slides, docs, sheets)")
 }

@@ -91,6 +91,7 @@ Once installed and provided with a Desktop OAuth `client_secret.json` (see [Gett
    - **Google Drive API** (`drive.googleapis.com`)
    - **Google Docs API** (`docs.googleapis.com`)
    - **Google Sheets API** (`sheets.googleapis.com`)
+   - **Google Slides API** (`slides.googleapis.com`)
 3. Navigate to **APIs & Services > Credentials**.
 4. Click **Create Credentials > OAuth client ID** and select **Desktop app** as the application type.
 5. Download the JSON file, save it as `client_secret.json`, and pass it once to `drivectl auth login --secret-file client_secret.json`.
@@ -103,7 +104,7 @@ Once installed and provided with a Desktop OAuth `client_secret.json` (see [Gett
 | `drivectl list` | `workspace` | List and search files in Google Drive |
 | `drivectl describe <file-id>` | `workspace` | Fetch detailed metadata for a Drive file |
 | `drivectl get <file-id>` | `workspace` | Download a file or export a Google Doc (`raw`, `txt`, `md`, `pdf`) |
-| `drivectl upload <local-path>` | `workspace` | Upload a local file to Google Drive |
+| `drivectl upload <local-path>` | `workspace` | Upload a local file to Google Drive (with optional `--convert slides\|docs\|sheets`) |
 | `drivectl revisions <file-id>` | `workspace` | List the revision history of a file |
 | `drivectl comments <file-id>` | `workspace` | List threaded comments and replies on a file |
 | `drivectl docs create <title> [md]` | `workspace` | Create a Google Doc (optionally converting a local Markdown file) |
@@ -111,6 +112,8 @@ Once installed and provided with a Desktop OAuth `client_secret.json` (see [Gett
 | `drivectl sheets get <id>` | `workspace` | Export a Google Sheet tab to CSV |
 | `drivectl sheets get-range <id>` | `workspace` | Read cell values from an A1 range |
 | `drivectl sheets update-range <id> <val>` | `workspace` | Write a value to an A1 range |
+| `drivectl slides get <pres-id>` | `workspace` | Render a Google Slides presentation (slides, tables, notes) as Markdown or JSON |
+| `drivectl slides create <title>` | `workspace` | Create a new Google Slides presentation via the Slides API |
 | `drivectl call <api.ver.res.method>` | `api` | Dynamically invoke any Google REST endpoint via Discovery |
 | `drivectl run <recipe.json>` | `api` | Execute a sequence of `drivectl` commands from a JSON recipe |
 | `drivectl --mcp` / `--mcp-http :8080` | root flags | Run `drivectl` as an MCP server over stdio or HTTP |
@@ -161,6 +164,9 @@ Once installed and provided with a Desktop OAuth `client_secret.json` (see [Gett
 
 # Upload into a specific folder with an explicit MIME type
 ./drivectl upload ./data.csv --parent <folder-id> --mime-type text/csv -O json
+
+# Upload a local .pptx and convert it directly into a native Google Slides presentation
+./drivectl upload ./deck.pptx --name "DevFest 2026 Workshop" --convert slides
 ```
 
 #### View file revisions and comments
@@ -200,6 +206,19 @@ Once installed and provided with a Desktop OAuth `client_secret.json` (see [Gett
 
 # Update a cell or range
 ./drivectl sheets update-range <spreadsheet-id> "Approved" --sheet "Sheet1" --range "B2" -O json
+```
+
+### Google Slides (`slides`)
+
+```bash
+# Create a new Google Slides presentation
+./drivectl slides create "DevFest 2026 Workshop" -O json
+
+# Render slides, tables, and speaker notes as Markdown
+./drivectl slides get <presentation-id>
+
+# Or upload a local .pptx and convert directly into native Google Slides
+./drivectl upload ./deck.pptx --name "DevFest 2026 Workshop" --convert slides
 ```
 
 ### Dynamic Discovery Calls (`call`)

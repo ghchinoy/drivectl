@@ -307,6 +307,103 @@ func TestDriveDocsSheetsAndSlidesServices(t *testing.T) {
 	if presMD != wantPresMD {
 		t.Errorf("FetchPresentationAsMarkdown(slidesSvc, \"pres1\") = %q, want %q", presMD, wantPresMD)
 	}
+
+	createdPres, err := CreatePresentation(slidesSvc, "DevFest 2026")
+	if err != nil {
+		t.Fatalf("CreatePresentation(slidesSvc, \"DevFest 2026\") error = %v", err)
+	}
+	if createdPres.PresentationId != "new-pres-id" {
+		t.Errorf("CreatePresentation(slidesSvc, \"DevFest 2026\").PresentationId = %q, want \"new-pres-id\"", createdPres.PresentationId)
+	}
+
+	batchResp, err := BatchUpdatePresentation(slidesSvc, "new-pres-id", []*slides.Request{
+		{CreateSlide: &slides.CreateSlideRequest{ObjectId: "slide-2"}},
+	})
+	if err != nil {
+		t.Fatalf("BatchUpdatePresentation(slidesSvc, \"new-pres-id\", ...) error = %v", err)
+	}
+	if batchResp.PresentationId != "new-pres-id" {
+		t.Errorf("BatchUpdatePresentation(...).PresentationId = %q, want \"new-pres-id\"", batchResp.PresentationId)
+	}
+}
+
+func TestResolveConvertMimeType(t *testing.T) {
+	tests := []struct {
+		name    string
+		target  string
+		want    string
+		wantErr bool
+	}{
+		{name: "empty", target: "", want: ""},
+		{name: "slides", target: "slides", want: "application/vnd.google-apps.presentation"},
+		{name: "presentation_uppercase", target: "Presentation", want: "application/vnd.google-apps.presentation"},
+		{name: "docs", target: "docs", want: "application/vnd.google-apps.document"},
+		{name: "sheets", target: "sheets", want: "application/vnd.google-apps.spreadsheet"},
+		{name: "invalid", target: "pdf", wantErr: true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ResolveConvertMimeType(tc.target)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("ResolveConvertMimeType(%q) error = %v, wantErr %v", tc.target, err, tc.wantErr)
+			}
+			if got != tc.want {
+				t.Errorf("ResolveConvertMimeType(%q) = %q, want %q", tc.target, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestUploadFileWithOptions(t *testing.T) {
+	var capturedBody string
+	var capturedFields string
+	httpClient := &http.Client{
+		Transport: fakeRoundTripper(func(req *http.Request) (*http.Response, error) {
+			capturedFields = req.URL.Query().Get("fields")
+			b, err := io.ReadAll(req.Body)
+			if err != nil {
+				return nil, err
+			}
+			capturedBody = string(b)
+			return jsonHTTPResponse(req, http.StatusOK, `{
+				"id":"slides-123",
+				"name":"Workshop Deck",
+				"mimeType":"application/vnd.google-apps.presentation",
+				"webViewLink":"https://docs.google.com/presentation/d/slides-123/edit"
+			}`), nil
+		}),
+	}
+	driveSvc, err := NewDriveService(t.Context(), httpClient)
+	if err != nil {
+		t.Fatalf("NewDriveService error = %v", err)
+	}
+
+	pptxPath := filepath.Join(t.TempDir(), "deck.pptx")
+	if err := os.WriteFile(pptxPath, []byte("PK-fake-pptx"), 0o600); err != nil {
+		t.Fatalf("os.WriteFile(%q) error = %v", pptxPath, err)
+	}
+
+	opts := UploadOptions{
+		Name:     "Workshop Deck",
+		ParentID: "folder-42",
+		MimeType: "application/vnd.google-apps.presentation",
+	}
+	got, err := UploadFileWithOptions(driveSvc, pptxPath, opts)
+	if err != nil {
+		t.Fatalf("UploadFileWithOptions(driveSvc, %q, %+v) error = %v", pptxPath, opts, err)
+	}
+	if got.Id != "slides-123" || got.WebViewLink == "" {
+		t.Errorf("UploadFileWithOptions returned %+v, want id=slides-123 and non-empty webViewLink", got)
+	}
+	if !strings.Contains(capturedFields, "webViewLink") {
+		t.Errorf("upload fields query = %q, want webViewLink", capturedFields)
+	}
+	for _, wantSubstr := range []string{`"name":"Workshop Deck"`, `"mimeType":"application/vnd.google-apps.presentation"`, `"parents":["folder-42"]`, "PK-fake-pptx"} {
+		if !strings.Contains(capturedBody, wantSubstr) {
+			t.Errorf("upload multipart body missing %q; got:\n%s", wantSubstr, capturedBody)
+		}
+	}
 }
 
 type fakeRoundTripper func(*http.Request) (*http.Response, error)
@@ -395,6 +492,10 @@ func newFakeServices(t *testing.T, ctx context.Context) (*drive.Service, *docs.S
 						}
 					}]
 				}`), nil
+			case req.Method == http.MethodPost && path == "/v1/presentations":
+				return jsonHTTPResponse(req, http.StatusOK, `{"presentationId":"new-pres-id","title":"DevFest 2026"}`), nil
+			case req.Method == http.MethodPost && path == "/v1/presentations/new-pres-id:batchUpdate":
+				return jsonHTTPResponse(req, http.StatusOK, `{"presentationId":"new-pres-id","replies":[{"createSlide":{"objectId":"slide-2"}}]}`), nil
 			default:
 				return jsonHTTPResponse(req, http.StatusNotFound, `{"error":"not found"}`), nil
 			}

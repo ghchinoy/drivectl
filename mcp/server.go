@@ -65,7 +65,9 @@ var dynamicTools = []string{
 	"sheets.v4.spreadsheets.get",
 	"sheets.v4.spreadsheets.values.get",
 	"sheets.v4.spreadsheets.values.update",
+	"slides.v1.presentations.create",
 	"slides.v1.presentations.get",
+	"slides.v1.presentations.batchUpdate",
 }
 
 // ClientProvider returns an authenticated *http.Client for executing Google Workspace API requests.

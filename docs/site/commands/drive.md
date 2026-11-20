@@ -42,7 +42,7 @@ drivectl get <google-doc-id> --format pdf -o document.pdf
 
 ## Upload local files (`upload`)
 
-Upload a local file to Google Drive with an optional target name (`--name`), parent folder (`--parent`), and explicit MIME type (`--mime-type`):
+Upload a local file to Google Drive with an optional target name (`--name`), parent folder (`--parent`), explicit MIME type (`--mime-type`), or automatic Workspace conversion (`--convert slides|docs|sheets`):
 
 ```sh
 # Upload a local file to My Drive
@@ -50,6 +50,9 @@ drivectl upload ./architecture.pdf --name "Architecture v2.pdf"
 
 # Upload into a specific Drive folder as JSON
 drivectl upload ./metrics.csv --parent <folder-id> --mime-type text/csv -O json
+
+# Upload a local .pptx and convert directly to native Google Slides
+drivectl upload ./workshop.pptx --name "Workshop Deck" --convert slides
 ```
 
 ## Revision history and comments (`revisions`, `comments`)

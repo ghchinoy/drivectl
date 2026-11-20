@@ -25,6 +25,7 @@ import (
 	"google.golang.org/api/docs/v1"
 	googledrive "google.golang.org/api/drive/v3"
 	"google.golang.org/api/sheets/v4"
+	"google.golang.org/api/slides/v1"
 
 	"github.com/ghchinoy/drivectl/internal/ui"
 	"github.com/ghchinoy/drivectl/pkg/drive"
@@ -53,6 +54,8 @@ var (
 	docsSvc *docs.Service
 	// sheetsSvc is the Google Sheets service client.
 	sheetsSvc *sheets.Service
+	// slidesSvc is the Google Slides service client.
+	slidesSvc *slides.Service
 )
 
 var rootCmd = &cobra.Command{
@@ -84,6 +87,7 @@ Google Docs, including exporting to multiple formats and accessing individual ta
 		driveSvc = svcs.Drive
 		docsSvc = svcs.Docs
 		sheetsSvc = svcs.Sheets
+		slidesSvc = svcs.Slides
 		return nil
 	},
 }

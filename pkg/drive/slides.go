@@ -30,6 +30,28 @@ func FetchPresentation(slidesSvc *slides.Service, presentationID string) (*slide
 	return pres, nil
 }
 
+// CreatePresentation creates a new blank Google Slides presentation with the given title.
+func CreatePresentation(slidesSvc *slides.Service, title string) (*slides.Presentation, error) {
+	pres, err := slidesSvc.Presentations.Create(&slides.Presentation{
+		Title: title,
+	}).Do()
+	if err != nil {
+		return nil, fmt.Errorf("unable to create presentation %q: %w", title, err)
+	}
+	return pres, nil
+}
+
+// BatchUpdatePresentation applies a batch of Google Slides API update requests to a presentation.
+func BatchUpdatePresentation(slidesSvc *slides.Service, presentationID string, requests []*slides.Request) (*slides.BatchUpdatePresentationResponse, error) {
+	resp, err := slidesSvc.Presentations.BatchUpdate(presentationID, &slides.BatchUpdatePresentationRequest{
+		Requests: requests,
+	}).Do()
+	if err != nil {
+		return nil, fmt.Errorf("unable to batch update presentation %q: %w", presentationID, err)
+	}
+	return resp, nil
+}
+
 // FetchPresentationAsMarkdown retrieves a Google Slides presentation and renders its slide text,
 // tables, and speaker notes as structured Markdown.
 func FetchPresentationAsMarkdown(slidesSvc *slides.Service, presentationID string) (string, error) {
