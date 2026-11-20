@@ -50,3 +50,16 @@ bd.db
 # Config files (metadata.json, config.yaml) are tracked by git by default
 # since no pattern above ignores them.
 export-state.json
+
+# Added by bd (missing required patterns)
+.env
+*.gate.lock*
+last_pull
+embeddeddolt/
+proxieddb/
+dolt-server-config.yaml
+daemon.*
+*.lock
+*.corrupt.backup/
+.beads-credential-key
+proxied_server_client_info.json
