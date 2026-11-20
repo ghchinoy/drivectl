@@ -399,7 +399,13 @@ func TestUploadFileWithOptions(t *testing.T) {
 	if !strings.Contains(capturedFields, "webViewLink") {
 		t.Errorf("upload fields query = %q, want webViewLink", capturedFields)
 	}
-	for _, wantSubstr := range []string{`"name":"Workshop Deck"`, `"mimeType":"application/vnd.google-apps.presentation"`, `"parents":["folder-42"]`, "PK-fake-pptx"} {
+	for _, wantSubstr := range []string{
+		`"name":"Workshop Deck"`,
+		`"mimeType":"application/vnd.google-apps.presentation"`,
+		`"parents":["folder-42"]`,
+		"Content-Type: application/vnd.openxmlformats-officedocument.presentationml.presentation",
+		"PK-fake-pptx",
+	} {
 		if !strings.Contains(capturedBody, wantSubstr) {
 			t.Errorf("upload multipart body missing %q; got:\n%s", wantSubstr, capturedBody)
 		}

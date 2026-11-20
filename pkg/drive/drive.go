@@ -17,12 +17,14 @@ package drive
 import (
 	"fmt"
 	"io"
+	"mime"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"google.golang.org/api/docs/v1"
 	"google.golang.org/api/drive/v3"
+	"google.golang.org/api/googleapi"
 )
 
 // TabInfo contains information about a tab in a Google Doc.
@@ -47,6 +49,7 @@ var formatMap = map[string]string{
 	"tsv":      "text/tab-separated-values",
 	"xlsx":     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 	"ods":      "application/vnd.oasis.opendocument.spreadsheet",
+	"odt":      "application/vnd.oasis.opendocument.text",
 	"pptx":     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 	"odp":      "application/vnd.oasis.opendocument.presentation",
 }
@@ -206,14 +209,36 @@ func UploadFileWithOptions(driveSvc *drive.Service, filePath string, opts Upload
 		meta.Parents = []string{opts.ParentID}
 	}
 
+	var mediaOpts []googleapi.MediaOption
+	if srcMime := detectSourceMimeType(filePath); srcMime != "" {
+		mediaOpts = append(mediaOpts, googleapi.ContentType(srcMime))
+	}
+
 	uploadedFile, err := driveSvc.Files.Create(meta).
-		Media(file).
+		Media(file, mediaOpts...).
 		Fields("id, name, mimeType, webViewLink").
 		Do()
 	if err != nil {
 		return nil, fmt.Errorf("unable to create file %q: %w", fileName, err)
 	}
 	return uploadedFile, nil
+}
+
+func detectSourceMimeType(filePath string) string {
+	ext := strings.TrimPrefix(strings.ToLower(filepath.Ext(filePath)), ".")
+	if ext == "" {
+		return ""
+	}
+	if known, ok := formatMap[ext]; ok {
+		return known
+	}
+	if detected := mime.TypeByExtension("." + ext); detected != "" {
+		if mediaType, _, err := mime.ParseMediaType(detected); err == nil {
+			return mediaType
+		}
+		return detected
+	}
+	return ""
 }
 
 // renderBodyAsText converts a Google Docs Body object to a Markdown string.
