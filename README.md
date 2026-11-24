@@ -30,7 +30,7 @@ A Go command-line interface (CLI) and Model Context Protocol (MCP) server for in
 | **Docs Markdown AST & PDF export** | Yes (`docs create`, `get --format md\|pdf`) | Raw JSON (`read_doc`, `update_doc`) | Plain-text append (`docs +write`) |
 | **Slides CLI & `.pptx` conversion** | Yes (`get`, `inspect`, `replace`, `notes`, `--convert slides`) | Raw JSON + `read_slide_page_thumbnail` | Raw Discovery calls |
 | **Multimodal file text extraction** | Native Docs/Sheets/Slides only | Yes (`read_file_content` parses PDF, Office, PNG/JPEG) | Raw Discovery calls |
-| **Auth & Governance** | Desktop OAuth (5 scopes); no preview gate | Developer Preview + `is_agentic` OAuth flag; Workspace DLP/governance | OS keychain AES-256-GCM, Service Accounts, Model Armor |
+| **Auth & Governance** | Desktop OAuth (5 scopes, PKCE + AES-256-GCM, `--agentic` profiles); no preview gate | Developer Preview + `is_agentic` OAuth flag; Workspace DLP/governance | OS keychain AES-256-GCM, Service Accounts, Model Armor |
 
 </details>
 
@@ -135,7 +135,9 @@ Once installed and provided with a Desktop OAuth `client_secret.json` (see [Gett
 
 | Command | Group | Purpose |
 |---|---|---|
-| `drivectl auth login` | `config` | Authenticate with Google OAuth 2.0 and cache tokens locally |
+| `drivectl auth login` | `auth` | Authenticate with Google OAuth 2.0 (PKCE, encrypted cache, optional `--agentic` profile) |
+| `drivectl auth status` | `auth` | Inspect active profile, agentic flag, encryption status, and token expiry |
+| `drivectl auth logout` | `auth` | Remove cached OAuth token for the active profile |
 | `drivectl list` | `workspace` | List and search files in Google Drive |
 | `drivectl describe <file-id>` | `workspace` | Fetch detailed metadata for a Drive file |
 | `drivectl get <file-id>` | `workspace` | Download a file or export a Google Doc (`raw`, `txt`, `md`, `pdf`) |
@@ -158,23 +160,31 @@ Once installed and provided with a Desktop OAuth `client_secret.json` (see [Gett
 
 ### Authentication (`auth`)
 
-`drivectl` caches your client secret (`client_secret.json`) and OAuth token (`token.json`) in `~/.config/drivectl/` and refreshes access tokens automatically. You can also supply the secret path via the `DRIVE_SECRETS` environment variable (`--secret-file` takes precedence over `DRIVE_SECRETS`, which takes precedence over `~/.config/drivectl/client_secret.json`).
+`drivectl` caches your client secret (`client_secret.json`) and AES-256-GCM encrypted OAuth token (`token.json`) in `~/.config/drivectl/` (or `~/.config/drivectl/profiles/<name>/` for named profiles) and persists refreshed tokens automatically. You can supply the secret path via `--secret-file` or `DRIVE_SECRETS`, select a profile via `--profile` or `DRIVECTL_PROFILE`, and optionally supply your own 32-byte base64 key via `DRIVECTL_ENCRYPTION_KEY`.
 
 ```bash
-# Browser-based OAuth login (default; listens briefly on http://localhost:8080)
+# Browser-based OAuth login (PKCE S256 + CSRF state on an ephemeral 127.0.0.1 loopback port)
 ./drivectl auth login --secret-file /path/to/client_secret.json
 
-# Or supply the secret path via environment variable
-DRIVE_SECRETS=/path/to/client_secret.json ./drivectl auth login
+# Dedicated agentic OAuth profile (for clients marked "Use this client for an AI-powered agent")
+./drivectl auth login --agentic --secret-file /path/to/agent_client_secret.json
+
+# Inspect active profile, agentic flag, encryption-at-rest, and token expiry
+./drivectl auth status
+./drivectl auth status --profile agent -O json
+
+# Remove cached token for a profile
+./drivectl auth logout --profile agent
 
 # Headless / remote session login (prints manual authorization URL)
 ./drivectl auth login --secret-file /path/to/client_secret.json --no-browser-auth
 ```
 
 > [!NOTE]
-> - **Local callback port (`8080`):** Default browser login temporarily starts a local HTTP listener on `http://localhost:8080` to capture the OAuth callback. Ensure port `8080` is free during login (for example, stop any local dev server or `drivectl --mcp-http :8080` first).
-> - **Headless (`--no-browser-auth`):** Open the printed URL in a browser on any device and grant access. After consenting, the browser redirects to `http://localhost/?state=...&code=...` (a "cannot connect" page is expected). Copy the `code` query parameter value from the browser address bar and paste it into the terminal prompt.
-> - **Re-authenticating:** Once cached, run `./drivectl auth login` without `--secret-file` to force a fresh consent flow (for example, after new scopes are added or a 7-day Testing-mode refresh token expires).
+> - **Ephemeral loopback callback:** Default browser login binds `127.0.0.1:0` with PKCE (`S256`) and random CSRF `state` verification—no fixed port conflicts with `:8080` or local dev servers.
+> - **Agentic OAuth profiles (`--agentic`):** When running `drivectl --mcp` or `--mcp-http`, `drivectl` automatically prefers the `agent` profile (or `DRIVECTL_AGENT_SECRETS`) when configured, keeping AI agent credentials separate from interactive CLI credentials.
+> - **Encrypted token storage:** Cached tokens are encrypted at rest with AES-256-GCM (`.encryption_key` with `0600` permissions, or `DRIVECTL_ENCRYPTION_KEY`). Legacy plaintext `token.json` files are read seamlessly and upgraded in place.
+> - **Headless (`--no-browser-auth`):** Open the printed URL in a browser on any device and grant access. Copy the `code` query parameter value from the redirect URL and paste it into the terminal prompt.
 
 ### Google Drive Files (`list`, `describe`, `get`, `upload`, `revisions`, `comments`)
 
@@ -326,11 +336,14 @@ Chain multiple `drivectl` commands in a declarative JSON recipe ([`recipes/sampl
 `drivectl` includes a built-in Model Context Protocol (MCP) server (`github.com/modelcontextprotocol/go-sdk`) that exposes both native tools (`drivectl_list`, `drivectl_read`, `drivectl_call`) and dynamically generated Discovery tools (`drive_v3_files_list`, `docs_v1_documents_get`, `sheets_v4_spreadsheets_get`).
 
 ```bash
-# Start MCP server over stdio (default for AI coding agents)
+# Start MCP server over stdio (default for AI coding agents; auto-uses "agent" profile if configured)
 ./drivectl --mcp
 
-# Start MCP server over HTTP (Streamable HTTP + SSE compatibility)
+# Start MCP server over HTTP (defaults ":8080" to 127.0.0.1:8080 with Origin validation)
 ./drivectl --mcp-http :8080
+
+# Require Bearer token authentication on HTTP MCP requests
+DRIVECTL_MCP_AUTH_TOKEN="your-secret-token" ./drivectl --mcp-http 127.0.0.1:8080
 ```
 
 ## Using as a Go Library (`pkg/drive`, `pkg/discovery`, `mcp`)
@@ -451,8 +464,8 @@ Issues and pull requests are welcome! Before opening a pull request:
 - **`client secret file not found` / `unable to read client secret file`:** Run `drivectl auth login --secret-file /path/to/client_secret.json` (or set `DRIVE_SECRETS=/path/to/client_secret.json`) once to initialize `~/.config/drivectl/client_secret.json` and `~/.config/drivectl/token.json`.
 - **`unable to parse client secret file to config`:** Ensure your JSON file is an **OAuth 2.0 Desktop app** client secret (`{"installed": {...}}`), not a Service Account key (`{"type": "service_account", ...}`) or API key.
 - **`Error 403: access_denied` during browser consent:** Your Google Cloud project's OAuth consent screen is set to **External** in **Testing** mode. Open **Google Auth Platform > Audience > Test users** in the Google Cloud Console and add the Google account you are signing in with.
-- **`failed to start local server` / port `8080` already in use:** Default browser login listens on `http://localhost:8080`. Free port `8080` temporarily, or authenticate with `--no-browser-auth`.
-- **Browser does not open on a remote or SSH host:** Pass `--no-browser-auth` to `drivectl auth login`, open the printed authorization URL on your local machine, and paste the `code` query parameter from the resulting `http://localhost/?...&code=...` redirect URL into the terminal.
+- **`decrypting cached token` / rotated encryption key:** If `.encryption_key` or `DRIVECTL_ENCRYPTION_KEY` changed, clear the cached token with `drivectl auth logout` and re-authenticate with `drivectl auth login`.
+- **Browser does not open on a remote or SSH host:** Pass `--no-browser-auth` to `drivectl auth login`, open the printed authorization URL on your local machine, and paste the `code` query parameter from the resulting redirect URL into the terminal.
 - **`403 Forbidden: Google Drive/Docs/Sheets/Slides API has not been used in project`:** Enable the corresponding API (`drive.googleapis.com`, `docs.googleapis.com`, `sheets.googleapis.com`, `slides.googleapis.com`) in the Google Cloud Console for the project that owns your OAuth client ID.
 
 ## License

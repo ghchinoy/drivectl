@@ -40,7 +40,7 @@ Before authenticating for the first time, create a **Desktop app** OAuth 2.0 cli
 
 - a **Service Account** JSON key (`{"type": "service_account", ...}` — not currently supported),
 - an **API key**, or
-- a **Web application** OAuth client (`{"web": ...}`), which rejects loopback redirects unless `http://localhost:8080` is manually registered.
+- a **Web application** OAuth client (`{"web": ...}`), which does not allow ephemeral loopback redirect ports (`http://127.0.0.1:<port>`).
 :::
 
 1. Open the [Google Cloud Console](https://console.cloud.google.com/) and select or create a project.
@@ -54,6 +54,7 @@ Before authenticating for the first time, create a **Desktop app** OAuth 2.0 cli
    - Under **Audience**, choose **Internal** (if you are in a Google Workspace organization and only org users will sign in) or **External** (for personal Gmail accounts or cross-org use).
    - If **External** stays in **Testing** publishing status, open **Audience > Test users** and add every Google email address that will sign in — otherwise login fails with `Error 403: access_denied`. *(Google expires refresh tokens for External apps in Testing mode after 7 days; re-run `drivectl auth login` when needed.)*
 4. Open **Google Auth Platform > Clients** (or **APIs & Services > Credentials**), select **Create Client** / **Create Credentials > OAuth client ID**, and choose **Desktop app**.
+   - If you are creating a dedicated OAuth client for AI agent / MCP usage, check **Use this client for an AI-powered agent** and authenticate it with `drivectl auth login --agentic --secret-file <path>`. Keep a separate client for non-agent interactive CLI use.
 5. Download the JSON file (verify it starts with `{"installed": ...}`) and save it as `client_secret.json`.
 
 ## Next step

@@ -15,11 +15,12 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -28,28 +29,31 @@ import (
 	"github.com/ghchinoy/drivectl/pkg/drive"
 )
 
+var authLoginAgentic bool
+
 var authCmd = &cobra.Command{
 	Use:     "auth",
 	GroupID: GroupAuth,
 	Short:   "Authentication commands",
-	Long:    `Manage authentication state for drivectl.`,
+	Long:    `Manage authentication state and OAuth profiles for drivectl.`,
 }
 
 var authLoginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Login to Google Drive",
-	Long: `Login to Google Drive using OAuth2.
-This command will open your browser to authenticate with Google.
-It will save the credentials to a local configuration directory for future use.`,
-	Example: `  drivectl auth login --secret-file ./client_secret.json`,
+	Long: `Login to Google Drive using OAuth 2.0 with PKCE (S256) and encrypted token caching.
+Use --agentic when authenticating with an OAuth client marked "Use this client for an AI-powered agent"
+in Google Auth Platform (defaults to the "agent" profile unless --profile is specified).`,
+	Example: `  drivectl auth login --secret-file ./client_secret.json
+  drivectl auth login --agentic --secret-file ./agent_client_secret.json`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
+		profile := resolveLoginProfile(viper.GetString("profile"), authLoginAgentic)
 		secretFile := viper.GetString("secret-file")
 
-		configDir, err := drive.ConfigDir()
+		targetSecretFile, err := drive.ProfileSecretFile(profile)
 		if err != nil {
 			return err
 		}
-		targetSecretFile := filepath.Join(configDir, "client_secret.json")
 
 		if secretFile != "" && secretFile != targetSecretFile {
 			fmt.Printf("Copying client secrets from %s to %s...\n", secretFile, targetSecretFile)
@@ -58,27 +62,113 @@ It will save the credentials to a local configuration directory for future use.`
 			}
 		}
 
-		if _, err := os.Stat(targetSecretFile); os.IsNotExist(err) {
-			return ui.ErrorWithHint(
-				errors.New("client secret file not found"),
-				"Provide one via --secret-file on your first login.",
-			)
+		rawSecret, err := os.ReadFile(targetSecretFile)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return ui.ErrorWithHint(
+					errors.New("client secret file not found"),
+					"Provide one via --secret-file on your first login.",
+				)
+			}
+			return err
 		}
 
-		tokenFile, err := drive.TokenCacheFile()
-		if err == nil {
-			_ = os.Remove(tokenFile)
-		}
+		_, _ = drive.ClearProfileToken(profile)
 
-		fmt.Println("Starting OAuth login flow...")
-		if _, err := drive.NewOAuthClient(cmd.Context(), targetSecretFile, noBrowserAuth); err != nil {
+		fmt.Printf("Starting OAuth login flow for profile %q...\n", profile)
+		if _, err := drive.NewOAuthClientWithOptions(cmd.Context(), drive.AuthOptions{
+			SecretFile:    targetSecretFile,
+			Profile:       profile,
+			Agentic:       authLoginAgentic,
+			NoBrowserAuth: noBrowserAuth,
+			UserAgent:     fmt.Sprintf("drivectl/%s", Version),
+		}); err != nil {
 			wrapped := fmt.Errorf("login failed: %w", err)
 			return ui.ErrorWithHint(wrapped, "Ensure your client_secret.json is valid and the browser flow completed.")
 		}
 
-		ui.PrintSuccess("Login successful! You can now run drivectl commands.")
+		if err := drive.SaveProfileMetadata(profile, drive.ProfileMetadata{
+			Profile:  profile,
+			Agentic:  authLoginAgentic,
+			ClientID: drive.ExtractClientID(rawSecret),
+			Scopes:   drive.DefaultOAuthScopes(),
+		}); err != nil {
+			return fmt.Errorf("saving profile metadata: %w", err)
+		}
+
+		ui.PrintSuccess("Login successful for profile %q! Credentials are encrypted at rest.", profile)
 		return nil
 	},
+}
+
+var authStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Inspect authentication status for a profile",
+	Example: `  drivectl auth status
+  drivectl auth status --profile agent -O json`,
+	RunE: func(_ *cobra.Command, _ []string) error {
+		profile := viper.GetString("profile")
+		status, err := drive.InspectAuthStatus(profile)
+		if err != nil {
+			return err
+		}
+
+		if OutputFormat == "json" {
+			data, err := json.MarshalIndent(status, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(data))
+			return nil
+		}
+
+		printAuthStatus(status)
+		return nil
+	},
+}
+
+var authLogoutCmd = &cobra.Command{
+	Use:   "logout",
+	Short: "Remove cached OAuth token for a profile",
+	Example: `  drivectl auth logout
+  drivectl auth logout --profile agent`,
+	RunE: func(_ *cobra.Command, _ []string) error {
+		profile := viper.GetString("profile")
+		tokenPath, err := drive.ClearProfileToken(profile)
+		if err != nil {
+			return err
+		}
+		ui.PrintSuccess("Removed cached token at %s", tokenPath)
+		return nil
+	},
+}
+
+func resolveLoginProfile(explicitProfile string, agentic bool) string {
+	trimmed := strings.TrimSpace(explicitProfile)
+	if trimmed != "" {
+		return trimmed
+	}
+	if agentic {
+		return drive.AgentProfile
+	}
+	return drive.DefaultProfile
+}
+
+func printAuthStatus(s drive.AuthStatus) {
+	fmt.Printf("Profile:       %s\n", s.Profile)
+	fmt.Printf("Agentic:       %t\n", s.Agentic)
+	fmt.Printf("Config Dir:    %s\n", s.ConfigDir)
+	fmt.Printf("Client Secret: %s (exists=%t)\n", s.SecretFile, s.SecretExists)
+	if s.ClientID != "" {
+		fmt.Printf("Client ID:     %s\n", s.ClientID)
+	}
+	fmt.Printf("Token File:    %s (exists=%t, encrypted=%t)\n", s.Token.Path, s.Token.Exists, s.Token.Encrypted)
+	if s.Token.Exists {
+		fmt.Printf("Token Valid:   %t (has_refresh=%t)\n", s.TokenValid, s.HasRefresh)
+		if s.TokenExpiry != "" {
+			fmt.Printf("Token Expiry:  %s\n", s.TokenExpiry)
+		}
+	}
 }
 
 func copySecretFile(srcPath, dstPath string) error {
@@ -106,5 +196,8 @@ func copySecretFile(srcPath, dstPath string) error {
 
 func init() {
 	rootCmd.AddCommand(authCmd)
+	authLoginCmd.Flags().BoolVar(&authLoginAgentic, "agentic", false, `mark this profile as using a Google Auth Platform "AI-powered agent" OAuth client (defaults --profile to "agent")`)
 	authCmd.AddCommand(authLoginCmd)
+	authCmd.AddCommand(authStatusCmd)
+	authCmd.AddCommand(authLogoutCmd)
 }
