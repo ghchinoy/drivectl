@@ -19,17 +19,25 @@ This skill provides guidance on using the `drivectl` command-line tool to intera
 The user must authenticate once before using `drivectl`. Tokens are encrypted at rest (AES-256-GCM) in `~/.config/drivectl/` (or `~/.config/drivectl/profiles/<name>/` for named profiles) and refreshed automatically.
 
 ```bash
-# Check current auth status and encryption state (non-interactive)
+# Check current auth status, scopes, and encryption state (non-interactive)
 drivectl auth status -O json
 
-# Standard interactive login (PKCE S256 on ephemeral 127.0.0.1 loopback)
+# Inspect minimal required scopes for a command before running it
+drivectl auth scopes upload -O json
+
+# Standard interactive login (PKCE S256 on ephemeral 127.0.0.1 loopback; supports --readonly, --services, --prompt-consent)
 drivectl auth login --secret-file /path/to/your/client_secret.json
 
 # Dedicated agentic OAuth profile (for clients marked "Use this client for an AI-powered agent")
 drivectl auth login --agentic --secret-file /path/to/agent_client_secret.json
 
-# Clear cached token for a profile
+# Refresh, revoke/logout, or reset a profile
+drivectl auth refresh
 drivectl auth logout --profile agent
+drivectl auth reset --profile agent
+
+# Headless / CI execution with a pre-obtained OAuth access token (env var or --token-file)
+DRIVECTL_TOKEN="$ACCESS_TOKEN" drivectl list -O json
 ```
 
 *(Never run interactive `auth login` unattended inside a headless agent without user involvement; if operating on a remote/SSH host without a local browser, append `--no-browser-auth` so the user can open the authorization URL and paste back the code).*

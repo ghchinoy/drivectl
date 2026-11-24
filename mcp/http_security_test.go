@@ -160,3 +160,18 @@ func TestResolveMCPProfileAndSecret(t *testing.T) {
 		t.Fatalf("resolveMCPProfileAndSecret() with env = (%q, %q), want (%q, %q)", prof, sec, drive.AgentProfile, "/tmp/custom-agent-secret.json")
 	}
 }
+
+func TestNewHTTPClient_BearerTokenEnv(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv(drive.AccessTokenEnvVar, "mcp-bearer-token")
+	viper.Reset()
+	defer viper.Reset()
+
+	gotClient, err := newHTTPClient(t.Context())
+	if err != nil {
+		t.Fatalf("newHTTPClient(ctx) with DRIVECTL_TOKEN error = %v", err)
+	}
+	if gotClient == nil {
+		t.Fatalf("newHTTPClient(ctx) with DRIVECTL_TOKEN = nil, want non-nil *http.Client")
+	}
+}

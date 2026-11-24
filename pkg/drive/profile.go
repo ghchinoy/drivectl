@@ -15,6 +15,7 @@
 package drive
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,26 +49,39 @@ type ProfileMetadata struct {
 
 // AuthStatus summarizes the current authentication state for a profile.
 type AuthStatus struct {
-	Profile      string             `json:"profile"`
-	ConfigDir    string             `json:"config_dir"`
-	SecretFile   string             `json:"secret_file"`
-	SecretExists bool               `json:"secret_exists"`
-	ClientID     string             `json:"client_id,omitempty"`
-	Agentic      bool               `json:"agentic"`
-	Token        TokenStoreMetadata `json:"token"`
-	TokenValid   bool               `json:"token_valid"`
-	TokenExpiry  string             `json:"token_expiry,omitempty"`
-	HasRefresh   bool               `json:"has_refresh_token"`
-	Scopes       []string           `json:"scopes,omitempty"`
+	Profile           string             `json:"profile"`
+	ConfigDir         string             `json:"config_dir"`
+	SecretFile        string             `json:"secret_file"`
+	SecretExists      bool               `json:"secret_exists"`
+	ClientID          string             `json:"client_id,omitempty"`
+	Agentic           bool               `json:"agentic"`
+	BearerTokenSource string             `json:"bearer_token_source,omitempty"`
+	Token             TokenStoreMetadata `json:"token"`
+	TokenValid        bool               `json:"token_valid"`
+	TokenExpiry       string             `json:"token_expiry,omitempty"`
+	HasRefresh        bool               `json:"has_refresh_token"`
+	Scopes            []string           `json:"scopes,omitempty"`
 }
 
 // AuthOptions configures profile-aware OAuth authentication and request tagging.
 type AuthOptions struct {
-	SecretFile    string
-	Profile       string
-	Agentic       bool
-	NoBrowserAuth bool
-	UserAgent     string
+	SecretFile           string
+	Profile              string
+	Agentic              bool
+	NoBrowserAuth        bool
+	UserAgent            string
+	Scopes               []string
+	PromptConsent        bool
+	IncludeGrantedScopes bool
+}
+
+// ResetResult summarizes the outcome of resetting an authentication profile.
+type ResetResult struct {
+	Profile       string   `json:"profile"`
+	ConfigDir     string   `json:"config_dir"`
+	Revoked       bool     `json:"revoked"`
+	RevokeWarning string   `json:"revoke_warning,omitempty"`
+	RemovedFiles  []string `json:"removed_files,omitempty"`
 }
 
 // NormalizeProfile validates and normalizes a profile name, defaulting empty names to "default".
@@ -215,6 +229,10 @@ func InspectAuthStatus(profile string) (AuthStatus, error) {
 		Scopes:     meta.Scopes,
 	}
 
+	if strings.TrimSpace(os.Getenv(AccessTokenEnvVar)) != "" {
+		status.BearerTokenSource = "env:" + AccessTokenEnvVar
+	}
+
 	if rawSecret, err := os.ReadFile(secretPath); err == nil {
 		status.SecretExists = true
 		if status.ClientID == "" {
@@ -243,6 +261,63 @@ func ClearProfileToken(profile string) (string, error) {
 		return tokenPath, fmt.Errorf("removing cached token %q: %w", tokenPath, err)
 	}
 	return tokenPath, nil
+}
+
+// ResetProfile optionally revokes the cached OAuth token and removes all local credential
+// and profile files for the specified profile.
+func ResetProfile(ctx context.Context, profile string, skipRevoke bool) (ResetResult, error) {
+	norm, err := NormalizeProfile(profile)
+	if err != nil {
+		return ResetResult{}, err
+	}
+	dir, err := ProfileConfigDir(norm)
+	if err != nil {
+		return ResetResult{}, err
+	}
+
+	res := ResetResult{
+		Profile:   norm,
+		ConfigDir: dir,
+	}
+
+	tokenPath := filepath.Join(dir, "token.json")
+	if !skipRevoke {
+		revokeCachedToken(ctx, tokenPath, &res)
+	}
+
+	targets := []string{
+		tokenPath,
+		filepath.Join(dir, "client_secret.json"),
+		filepath.Join(dir, profileMetadataFile),
+		filepath.Join(dir, encryptionKeyFile),
+	}
+	for _, targetPath := range targets {
+		err := os.Remove(targetPath)
+		if err == nil {
+			res.RemovedFiles = append(res.RemovedFiles, targetPath)
+			continue
+		}
+		if !errors.Is(err, os.ErrNotExist) {
+			return res, fmt.Errorf("removing %q: %w", targetPath, err)
+		}
+	}
+
+	if norm != DefaultProfile {
+		_ = os.Remove(dir)
+	}
+	return res, nil
+}
+
+func revokeCachedToken(ctx context.Context, tokenPath string, res *ResetResult) {
+	tok, err := TokenFromFile(tokenPath)
+	if err != nil {
+		return
+	}
+	if revokeErr := RevokeToken(ctx, nil, tok); revokeErr != nil {
+		res.RevokeWarning = revokeErr.Error()
+		return
+	}
+	res.Revoked = true
 }
 
 // WrapHTTPClientUserAgent wraps an *http.Client's transport to attach a default User-Agent header.

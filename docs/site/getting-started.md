@@ -13,11 +13,21 @@ Pass your `client_secret.json` file to `drivectl auth login` on your first run, 
 # Pass the secret file via flag (default profile)
 drivectl auth login --secret-file /path/to/client_secret.json
 
+# Least-privilege read-only login for specific services (merges incrementally on later --services logins)
+drivectl auth login --readonly --services drive,docs --secret-file /path/to/client_secret.json
+
 # Dedicated agentic OAuth profile (for clients marked "Use this client for an AI-powered agent")
 drivectl auth login --agentic --secret-file /path/to/agent_client_secret.json
 
-# Inspect profile, encryption status, and token expiry
+# Inspect status, required scopes, refresh, revoke/logout, or reset a profile
 drivectl auth status
+drivectl auth scopes upload
+drivectl auth refresh
+drivectl auth logout
+drivectl auth reset
+
+# CI / headless runs with an existing OAuth access token (no client_secret.json needed)
+DRIVECTL_TOKEN="$ACCESS_TOKEN" drivectl list --limit 5 -O json
 ```
 
 `drivectl` caches your client secret (`client_secret.json`) and AES-256-GCM encrypted OAuth token (`token.json`) in `~/.config/drivectl/` (or `~/.config/drivectl/profiles/<name>/` for named profiles) and persists refreshed tokens automatically. When resolving the secret path, `--secret-file` takes precedence over `DRIVE_SECRETS`, which takes precedence over the profile's cached `client_secret.json`.
@@ -35,7 +45,8 @@ drivectl auth login --secret-file /path/to/client_secret.json --no-browser-auth
 After you approve access in the browser, it will redirect to `http://localhost/?state=...&code=...` (a "cannot connect" page is expected because nothing is listening locally). Copy the `code` query parameter value from the browser address bar and paste it into the terminal prompt.
 
 :::tip[Re-authenticating & `Error 403: access_denied`]
-- Once `client_secret.json` is cached in `~/.config/drivectl/`, run `drivectl auth login` without `--secret-file` whenever you need a fresh consent flow (for example, to pick up newly added scopes or renew a 7-day Testing-mode refresh token).
+- Once `client_secret.json` is cached in `~/.config/drivectl/`, run `drivectl auth login --prompt-consent` whenever you need a fresh refresh token (for example, after a 7-day Testing-mode token expires or if `drivectl auth status` shows `has_refresh_token: false`).
+- Pass `--show-scopes` to any command (or run `drivectl auth scopes <command>`) to see the minimal OAuth scopes needed before signing in.
 - If Google shows `Error 403: access_denied` during consent, add your Google account under **Google Auth Platform > Audience > Test users** in the Google Cloud Console.
 :::
 

@@ -212,6 +212,18 @@ func resolveMCPProfileAndSecret() (profile, secretFile string) {
 }
 
 func newHTTPClient(ctx context.Context) (*http.Client, error) {
+	viper.AutomaticEnv()
+	bearerToken, _, err := drive.ResolveAccessToken(viper.GetString("token-file"), nil)
+	if err != nil {
+		return nil, fmt.Errorf("resolving bearer token: %w", err)
+	}
+	if bearerToken != "" {
+		return drive.WrapHTTPClientUserAgent(
+			drive.NewClientFromBearerToken(ctx, bearerToken),
+			"drivectl (mcp; bearer-token)",
+		), nil
+	}
+
 	profile, secretFile := resolveMCPProfileAndSecret()
 	meta, _ := drive.LoadProfileMetadata(profile)
 	if !meta.Agentic {

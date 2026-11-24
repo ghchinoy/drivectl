@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/ghchinoy/drivectl/pkg/drive"
 )
 
 func TestCLICommands(t *testing.T) {
@@ -291,9 +293,49 @@ func TestAuthStatusAndLogoutCommands(t *testing.T) {
 		t.Fatalf("auth status -O json error = %v", err)
 	}
 
-	rootCmd.SetArgs([]string{"auth", "logout", "--profile", "agent"})
+	rootCmd.SetArgs([]string{"auth", "logout", "--profile", "agent", "--local-only", "-O", "json"})
 	if err := ExecuteContext(t.Context()); err != nil {
-		t.Fatalf("auth logout --profile agent error = %v", err)
+		t.Fatalf("auth logout --profile agent --local-only error = %v", err)
+	}
+
+	rootCmd.SetArgs([]string{"auth", "reset", "--profile", "agent", "--local-only", "-O", "json"})
+	if err := ExecuteContext(t.Context()); err != nil {
+		t.Fatalf("auth reset --profile agent --local-only error = %v", err)
+	}
+
+	rootCmd.SetArgs([]string{"auth", "scopes", "slides", "notes", "-O", "json"})
+	if err := ExecuteContext(t.Context()); err != nil {
+		t.Fatalf("auth scopes slides notes error = %v", err)
+	}
+
+	rootCmd.SetArgs([]string{"auth", "login", "--readonly", "--services", "drive,docs", "--print-scopes", "-O", "json"})
+	if err := ExecuteContext(t.Context()); err != nil {
+		t.Fatalf("auth login --print-scopes error = %v", err)
+	}
+
+	rootCmd.SetArgs([]string{"list", "--show-scopes", "-O", "json"})
+	if err := ExecuteContext(t.Context()); err != nil {
+		t.Fatalf("list --show-scopes error = %v", err)
+	}
+	showScopes = false
+	authLoginReadOnly = false
+	authLoginServices = nil
+	authLoginPrintScopes = false
+	authLogoutLocalOnly = false
+	authResetLocalOnly = false
+	OutputFormat = ""
+}
+
+func TestInitAuthenticatedClient_BearerTokenEnv(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv(drive.AccessTokenEnvVar, "ci-bearer-token")
+
+	gotClient, err := initAuthenticatedClient(t.Context(), rootCmd)
+	if err != nil {
+		t.Fatalf("initAuthenticatedClient(ctx, rootCmd) with DRIVECTL_TOKEN error = %v", err)
+	}
+	if gotClient == nil {
+		t.Fatalf("initAuthenticatedClient(ctx, rootCmd) with DRIVECTL_TOKEN = nil, want non-nil *http.Client")
 	}
 }
 

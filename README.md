@@ -32,7 +32,7 @@ A Go command-line interface (CLI) and Model Context Protocol (MCP) server for in
 | **Docs Markdown AST & PDF** | Yes (`docs create`, `get --format md\|pdf`, `docs tabs`) | Raw JSON (`read_doc`, `update_doc`) | Raw JSON (`read_doc`, `update_doc`) | Plain-text append (`docs +write`) |
 | **Slides CLI & `.pptx` convert** | Yes (`create`, `get` MD, `inspect`, `replace`, `notes`, `--convert slides`) | Raw JSON + `read_slide_page_thumbnail` | Raw JSON + `read_slide_page_thumbnail` | Raw Discovery calls |
 | **Multimodal extraction** | Native Docs/Sheets/Slides only | Yes (`read_file_content` text/MD + comments) | Yes (`read_file_content` parses PDF, Office, PNG/JPEG) | Raw Discovery calls |
-| **Auth, Security & Telemetry** | Desktop OAuth (PKCE + AES-256-GCM, `--agentic` profiles); no preview gate; **zero telemetry** | Personal Mode onboarding, incremental/`--bundle=readonly` scopes, HITL elicitation, Model Armor; **telemetry on by default** (opt-out) | Developer Preview + `is_agentic` OAuth flag, Workspace DLP/governance, HITL elicitation | OS keychain AES-256-GCM, Service Accounts, Model Armor |
+| **Auth, Security & Telemetry** | Desktop OAuth (PKCE + AES-256-GCM, `--readonly`/`--services`, `--agentic` profiles, `DRIVECTL_TOKEN`); no preview gate; **zero telemetry** | Personal Mode onboarding, incremental/`--bundle=readonly` scopes, HITL elicitation, Model Armor; **telemetry on by default** (opt-out) | Developer Preview + `is_agentic` OAuth flag, Workspace DLP/governance, HITL elicitation | OS keychain AES-256-GCM, Service Accounts, Model Armor |
 
 </details>
 
@@ -154,9 +154,12 @@ For personal single-user setups, Google Cloud Console's **Personal mode onboardi
 
 | Command | Group | Purpose |
 |---|---|---|
-| `drivectl auth login` | `auth` | Authenticate with Google OAuth 2.0 (PKCE, encrypted cache, optional `--agentic` profile) |
-| `drivectl auth status` | `auth` | Inspect active profile, agentic flag, encryption status, and token expiry |
-| `drivectl auth logout` | `auth` | Remove cached OAuth token for the active profile |
+| `drivectl auth login` | `auth` | Authenticate with Google OAuth 2.0 (PKCE, encrypted cache, `--readonly`, `--services`, `--agentic`, `--prompt-consent`) |
+| `drivectl auth status` | `auth` | Inspect active profile, agentic flag, bearer token, scopes, encryption status, and token expiry |
+| `drivectl auth refresh` | `auth` | Force an immediate OAuth token refresh and persist the updated encrypted token |
+| `drivectl auth logout` | `auth` | Revoke the active OAuth token at Google and remove the local cached token (`--local-only` skips remote revocation) |
+| `drivectl auth reset` | `auth` | Revoke tokens and delete all cached credentials, metadata, and key files for a profile |
+| `drivectl auth scopes [cmd...]` | `auth` | Print minimal OAuth scopes required for a command (or pass `--show-scopes` to any command) |
 | `drivectl list` | `workspace` | List and search files in Google Drive |
 | `drivectl describe <file-id>` | `workspace` | Fetch detailed metadata for a Drive file |
 | `drivectl get <file-id>` | `workspace` | Download a file or export a Google Doc (`raw`, `txt`, `md`, `pdf`) |
@@ -179,21 +182,33 @@ For personal single-user setups, Google Cloud Console's **Personal mode onboardi
 
 ### Authentication (`auth`)
 
-`drivectl` caches your client secret (`client_secret.json`) and AES-256-GCM encrypted OAuth token (`token.json`) in `~/.config/drivectl/` (or `~/.config/drivectl/profiles/<name>/` for named profiles) and persists refreshed tokens automatically. You can supply the secret path via `--secret-file` or `DRIVE_SECRETS`, select a profile via `--profile` or `DRIVECTL_PROFILE`, and optionally supply your own 32-byte base64 key via `DRIVECTL_ENCRYPTION_KEY`.
+`drivectl` caches your client secret (`client_secret.json`) and AES-256-GCM encrypted OAuth token (`token.json`) in `~/.config/drivectl/` (or `~/.config/drivectl/profiles/<name>/` for named profiles) and persists refreshed tokens automatically. You can supply the secret path via `--secret-file` or `DRIVE_SECRETS`, select a profile via `--profile` or `DRIVECTL_PROFILE`, pass a pre-obtained bearer token in CI/headless environments via `DRIVECTL_TOKEN` or `--token-file` (or `-` for stdin), and optionally supply your own 32-byte base64 key via `DRIVECTL_ENCRYPTION_KEY`.
 
 ```bash
 # Browser-based OAuth login (PKCE S256 + CSRF state on an ephemeral 127.0.0.1 loopback port)
 ./drivectl auth login --secret-file /path/to/client_secret.json
 
+# Least-privilege read-only login for specific services (subsequent --services logins merge incrementally)
+./drivectl auth login --readonly --services drive,docs --secret-file /path/to/client_secret.json
+
+# Inspect minimal required scopes for any command before calling it
+./drivectl auth scopes upload -O json
+./drivectl list --show-scopes
+
 # Dedicated agentic OAuth profile (for clients marked "Use this client for an AI-powered agent")
 ./drivectl auth login --agentic --secret-file /path/to/agent_client_secret.json
 
-# Inspect active profile, agentic flag, encryption-at-rest, and token expiry
-./drivectl auth status
+# Inspect status, force refresh, revoke & log out, or wipe a profile
 ./drivectl auth status --profile agent -O json
-
-# Remove cached token for a profile
+./drivectl auth refresh
 ./drivectl auth logout --profile agent
+./drivectl auth reset --profile agent
+
+# Headless / CI execution with a pre-obtained OAuth access token (no local client_secret.json required)
+DRIVECTL_TOKEN="$ACCESS_TOKEN" ./drivectl list --limit 5 -O json
+
+# Force consent screen to ensure a fresh refresh token
+./drivectl auth login --prompt-consent
 
 # Headless / remote session login (prints manual authorization URL)
 ./drivectl auth login --secret-file /path/to/client_secret.json --no-browser-auth
@@ -201,6 +216,8 @@ For personal single-user setups, Google Cloud Console's **Personal mode onboardi
 
 > [!NOTE]
 > - **Ephemeral loopback callback:** Default browser login binds `127.0.0.1:0` with PKCE (`S256`) and random CSRF `state` verification—no fixed port conflicts with `:8080` or local dev servers.
+> - **Least-privilege & incremental scopes:** Pass `--readonly` and/or `--services drive,docs,sheets,slides` to limit granted scopes (`--replace-scopes` replaces prior profile scopes instead of merging; `--print-scopes` previews resolved scopes without opening a browser).
+> - **Pre-obtained tokens (`DRIVECTL_TOKEN` / `--token-file`):** Works in both CLI and MCP modes without local disk state. By design, `drivectl` avoids a raw `--token` CLI flag so access tokens do not leak into `ps` or `/proc/<pid>/cmdline`.
 > - **Agentic OAuth profiles (`--agentic`):** When running `drivectl --mcp` or `--mcp-http`, `drivectl` automatically prefers the `agent` profile (or `DRIVECTL_AGENT_SECRETS`) when configured, keeping AI agent credentials separate from interactive CLI credentials.
 > - **Encrypted token storage:** Cached tokens are encrypted at rest with AES-256-GCM (`.encryption_key` with `0600` permissions, or `DRIVECTL_ENCRYPTION_KEY`). Legacy plaintext `token.json` files are read seamlessly and upgraded in place.
 > - **Headless (`--no-browser-auth`):** Open the printed URL in a browser on any device and grant access. Copy the `code` query parameter value from the redirect URL and paste it into the terminal prompt.

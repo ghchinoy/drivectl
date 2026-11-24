@@ -46,6 +46,11 @@ var (
 	OutputFormat string
 	// noBrowserAuth is a flag to disable opening the browser for authentication.
 	noBrowserAuth bool
+	// showScopes prints the minimal OAuth scopes required by a command without executing it.
+	showScopes bool
+	// savedRunE / savedRun temporarily hold a command's handler when --show-scopes intercepts execution.
+	savedRunE func(*cobra.Command, []string) error
+	savedRun  func(*cobra.Command, []string)
 	// client is the HTTP client used for all API calls.
 	client *http.Client
 	// driveSvc is the Google Drive service client.
@@ -66,23 +71,25 @@ var rootCmd = &cobra.Command{
 It allows you to list, describe, and download files, with advanced support for
 Google Docs, including exporting to multiple formats and accessing individual tabs.`,
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		if showScopes {
+			if err := printCommandScopes(cmd); err != nil {
+				return err
+			}
+			savedRunE = cmd.RunE
+			savedRun = cmd.Run
+			cmd.RunE = func(*cobra.Command, []string) error { return nil }
+			cmd.Run = nil
+			return nil
+		}
 		if isAuthBypassCommand(cmd) {
 			return nil
 		}
 		ctx := cmd.Context()
 		var err error
 		if client == nil {
-			profile := viper.GetString("profile")
-			secretFile := viper.GetString("secret-file")
-			client, err = drive.NewOAuthClientWithOptions(ctx, drive.AuthOptions{
-				SecretFile:    secretFile,
-				Profile:       profile,
-				NoBrowserAuth: noBrowserAuth,
-				UserAgent:     fmt.Sprintf("drivectl/%s", Version),
-			})
+			client, err = initAuthenticatedClient(ctx, cmd)
 			if err != nil {
-				wrapped := fmt.Errorf("could not create oauth client: %w", err)
-				return ui.ErrorWithHint(wrapped, "run 'drivectl auth login' to authenticate")
+				return err
 			}
 		}
 
@@ -96,6 +103,39 @@ Google Docs, including exporting to multiple formats and accessing individual ta
 		slidesSvc = svcs.Slides
 		return nil
 	},
+	PersistentPostRun: func(cmd *cobra.Command, _ []string) {
+		if savedRunE != nil || savedRun != nil {
+			cmd.RunE = savedRunE
+			cmd.Run = savedRun
+			savedRunE = nil
+			savedRun = nil
+		}
+	},
+}
+
+func initAuthenticatedClient(ctx context.Context, cmd *cobra.Command) (*http.Client, error) {
+	userAgent := fmt.Sprintf("drivectl/%s", Version)
+	bearerToken, _, err := drive.ResolveAccessToken(viper.GetString("token-file"), cmd.InOrStdin())
+	if err != nil {
+		return nil, ui.ErrorWithHint(err, "Check DRIVECTL_TOKEN or --token-file.")
+	}
+	if bearerToken != "" {
+		return drive.WrapHTTPClientUserAgent(drive.NewClientFromBearerToken(ctx, bearerToken), userAgent), nil
+	}
+
+	profile := viper.GetString("profile")
+	secretFile := viper.GetString("secret-file")
+	httpClient, err := drive.NewOAuthClientWithOptions(ctx, drive.AuthOptions{
+		SecretFile:    secretFile,
+		Profile:       profile,
+		NoBrowserAuth: noBrowserAuth,
+		UserAgent:     userAgent,
+	})
+	if err != nil {
+		wrapped := fmt.Errorf("could not create oauth client: %w", err)
+		return nil, ui.ErrorWithHint(wrapped, "run 'drivectl auth login' to authenticate (or set DRIVECTL_TOKEN)")
+	}
+	return httpClient, nil
 }
 
 func isAuthBypassCommand(cmd *cobra.Command) bool {
@@ -131,13 +171,16 @@ func init() {
 
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().String("secret-file", "", "path to your client secrets file")
+	rootCmd.PersistentFlags().String("token-file", "", "path to a file containing a pre-obtained OAuth 2.0 access token (or '-' for stdin; alternative to DRIVECTL_TOKEN)")
 	rootCmd.PersistentFlags().String("profile", "", "authentication profile name (default: \"default\"; use \"agent\" for AI agent OAuth clients)")
 	rootCmd.PersistentFlags().StringVarP(&OutputFormat, "output-format", "O", "", "output format (e.g. json)")
 	rootCmd.PersistentFlags().BoolVar(&noBrowserAuth, "no-browser-auth", false, "do not open a browser for authentication")
+	rootCmd.PersistentFlags().BoolVar(&showScopes, "show-scopes", false, "print the minimal OAuth scopes required for the command and exit")
 	rootCmd.PersistentFlags().Bool("mcp", false, "enable MCP server mode over stdio")
 	rootCmd.PersistentFlags().String("mcp-http", "", "enable MCP server mode over HTTP at the given address (defaults to 127.0.0.1)")
 	_ = viper.BindPFlag("secret-file", rootCmd.PersistentFlags().Lookup("secret-file"))
 	_ = viper.BindEnv("secret-file", "DRIVE_SECRETS")
+	_ = viper.BindPFlag("token-file", rootCmd.PersistentFlags().Lookup("token-file"))
 	_ = viper.BindPFlag("profile", rootCmd.PersistentFlags().Lookup("profile"))
 	_ = viper.BindEnv("profile", "DRIVECTL_PROFILE")
 	_ = viper.BindPFlag("mcp", rootCmd.PersistentFlags().Lookup("mcp"))
