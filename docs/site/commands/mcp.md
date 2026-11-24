@@ -29,19 +29,18 @@ DRIVECTL_MCP_AUTH_TOKEN="your-secret-token" drivectl --mcp-http 127.0.0.1:8080
 
 In HTTP mode, `drivectl` binds `127.0.0.1` by default, rejects non-loopback browser `Origin` headers (preventing DNS rebinding), and enforces `Authorization: Bearer <token>` whenever `DRIVECTL_MCP_AUTH_TOKEN` is set. When a dedicated `agent` profile (created via `drivectl auth login --agentic`) or `DRIVECTL_AGENT_SECRETS` is present, MCP mode selects it automatically.
 
-## Registered MCP tools
+## Registered MCP tools & resources
 
-When the server starts, it registers two tiers of tools:
+When the server starts, `mcp.RegisterTools` mounts 14 Discovery-generated Google Workspace tools and 2 embedded resources:
 
-1. **Native Workspace tools:**
-   - `drivectl_list`: list files in Google Drive with optional query (`q`) and `pageSize`.
-   - `drivectl_read`: read or export a Google Drive file or Google Doc (`raw`, `txt`, `md`).
-   - `drivectl_call`: invoke any Google API method dynamically by `serviceMethod` and JSON `payload`.
-2. **Dynamic Discovery tools:**
-   - `drive.v3.files.list`, `drive.v3.files.get`, `drive.v3.files.create`, `drive.v3.files.update`
-   - `docs.v1.documents.create`, `docs.v1.documents.get`, `docs.v1.documents.batchUpdate`
-   - `sheets.v4.spreadsheets.create`, `sheets.v4.spreadsheets.get`, `sheets.v4.spreadsheets.values.get`, `sheets.v4.spreadsheets.values.update`
-   - `slides.v1.presentations.create`, `slides.v1.presentations.get`, `slides.v1.presentations.batchUpdate`
+1. **Dynamic Discovery tools:**
+   - **Drive:** `drive.v3.files.list`, `drive.v3.files.get`, `drive.v3.files.create`, `drive.v3.files.update`
+   - **Docs:** `docs.v1.documents.create`, `docs.v1.documents.get`, `docs.v1.documents.batchUpdate`
+   - **Sheets:** `sheets.v4.spreadsheets.create`, `sheets.v4.spreadsheets.get`, `sheets.v4.spreadsheets.values.get`, `sheets.v4.spreadsheets.values.update`
+   - **Slides:** `slides.v1.presentations.create`, `slides.v1.presentations.get`, `slides.v1.presentations.batchUpdate`
+2. **Embedded resources:**
+   - `embedded:drive-query-cheat-sheet` — common Google Drive `q` filter examples.
+   - `embedded:a1-notation-cheat-sheet` — Google Sheets A1 cell range reference.
 
 ## Embed in another Go MCP server
 

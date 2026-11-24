@@ -4,33 +4,35 @@
 [![Latest Release](https://img.shields.io/github/v/release/ghchinoy/drivectl)](https://github.com/ghchinoy/drivectl/releases)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-A Go command-line interface (CLI) and Model Context Protocol (MCP) server for interacting with **Google Drive**, **Google Docs**, and **Google Sheets**, plus dynamic calls to any Google Workspace REST endpoint via Google API Discovery Documents. Built for both interactive terminal workflows and AI coding agents with deterministic JSON output (`-O json`), Markdown-to-Docs AST conversion, and multi-step JSON recipes.
+A Go command-line interface (CLI) and Model Context Protocol (MCP) server for interacting with **Google Drive**, **Google Docs**, **Google Sheets**, and **Google Slides**, plus dynamic calls to any Google Workspace REST endpoint via Google API Discovery Documents. Built for both interactive terminal workflows and AI coding agents with deterministic JSON output (`-O json`), Markdown-to-Docs AST conversion, and multi-step JSON recipes.
 
 > [!IMPORTANT]
-> **Official Google Workspace CLI & Remote MCP Servers Available**
+> **Official Google Workspace CLI (`gwscli`) & Remote MCP Servers Available**
 >
-> Google now provides an official [Google Workspace CLI](https://developers.google.com/workspace/guides/workspace-cli) and hosted [Google Workspace Remote MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers#support-products) (Drive, Docs, Sheets, Slides, Gmail, Calendar, Chat, People, Classroom, and Universal Search).
+> Google now provides an official [Google Workspace CLI (`gwscli`)](https://developers.google.com/workspace/guides/workspace-cli) (prebuilt Go CLI backed by `*mcp.googleapis.com` for Drive, Docs, Sheets, Slides, Gmail, Calendar, Chat, Tasks, and People) and hosted [Google Workspace Remote MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers#support-products) (10 endpoints adding Classroom and Universal Search). Google also publishes a separate open-source Rust CLI, [`gws`](https://github.com/googleworkspace/cli), built directly over Discovery APIs.
 >
-> **Start with the official tools** for general Workspace automation, hosted MCP integrations, or multi-product workflows (Gmail, Calendar, Chat, Universal Search).
+> **Start with the official tools** for general Workspace automation, hosted MCP integrations, or multi-product workflows (Gmail, Calendar, Chat, Tasks, Universal Search).
 >
 > **`drivectl` remains useful when you need:**
 > - An **embeddable Go library** (`pkg/drive`, `pkg/discovery`, `mcp.RegisterTools`) for stateless Cloud Run backends or custom Go MCP hosts
-> - **Markdown $\leftrightarrow$ Google Docs** AST conversion (`docs create`, `get --format md|pdf`)
+> - **Stable, versioned CLI flags for static scripts & CI** (`gwscli` discovers schemas dynamically and explicitly warns against relying on fixed signatures in static scripts)
+> - **Markdown $\leftrightarrow$ Google Docs** AST conversion (`docs create`, `get --format md|pdf`) and `docs tabs` hierarchy inspection
 > - **Google Slides CLI ergonomics** (`slides get`, `inspect`, `replace`, `notes`, plus in-place `.pptx` $\rightarrow$ Slides conversion via `upload --convert slides --file-id`)
-> - **Drive revisions, comments, and Sheets CSV export** or a **single-binary local CLI/MCP** without Workspace Developer Preview enrollment
+> - **Drive revisions, RFC 4180 Sheets CSV export, zero usage telemetry**, or a **single-binary local MCP server** without Workspace Developer Preview enrollment
 
 <details>
-<summary><strong>Quick comparison: drivectl vs. official Workspace CLI &amp; Remote MCP</strong></summary>
+<summary><strong>Quick comparison: drivectl vs. official <code>gwscli</code>, Remote MCP &amp; open-source <code>gws</code></strong></summary>
 
-| Capability | `drivectl` | Official Remote MCP (`*mcp.googleapis.com`) | Workspace CLI (`gws`) |
-|---|---|---|---|
-| **Runtime** | Local Go binary (CLI + stdio/HTTP MCP) | Google-hosted remote Streamable HTTP | Local Rust binary + local MCP mode |
-| **Product breadth** | Drive, Docs, Sheets, Slides | 10 servers incl. Gmail, Calendar, Chat, Classroom, Universal Search | All Workspace Discovery APIs + `+workflow` helpers |
-| **Embeddable Go SDK** | Yes (`pkg/drive`, `pkg/discovery`, `mcp`) | No | No |
-| **Docs Markdown AST & PDF export** | Yes (`docs create`, `get --format md\|pdf`) | Raw JSON (`read_doc`, `update_doc`) | Plain-text append (`docs +write`) |
-| **Slides CLI & `.pptx` conversion** | Yes (`get`, `inspect`, `replace`, `notes`, `--convert slides`) | Raw JSON + `read_slide_page_thumbnail` | Raw Discovery calls |
-| **Multimodal file text extraction** | Native Docs/Sheets/Slides only | Yes (`read_file_content` parses PDF, Office, PNG/JPEG) | Raw Discovery calls |
-| **Auth & Governance** | Desktop OAuth (5 scopes, PKCE + AES-256-GCM, `--agentic` profiles); no preview gate | Developer Preview + `is_agentic` OAuth flag; Workspace DLP/governance | OS keychain AES-256-GCM, Service Accounts, Model Armor |
+| Capability | `drivectl` | Official CLI (`gwscli`) | Official Remote MCP (`*mcp.googleapis.com`) | Open-Source CLI (`gws`) |
+|---|---|---|---|---|
+| **Runtime** | Open-source Go binary (CLI + local stdio/HTTP MCP) | Closed-source Go binary over `*mcp.googleapis.com` | Google-hosted remote Streamable HTTP | Open-source Rust binary + local MCP mode |
+| **Product breadth** | Drive, Docs, Sheets, Slides (+ `call` Discovery) | 9 services: Drive, Docs, Sheets, Slides, Gmail, Calendar, Chat, Tasks, People *(Preview)* | 10 endpoints incl. Classroom & Universal Search (`workspacemcp`) | All Workspace Discovery APIs + `+workflow` helpers |
+| **Embeddable Go SDK** | Yes (`pkg/drive`, `pkg/discovery`, `mcp`) | No | No | No |
+| **Static-script stability** | Yes (stable versioned flags & JSON recipes) | No (runtime discovery; docs warn against static scripts) | Dynamic MCP tool discovery | Dynamic Discovery commands |
+| **Docs Markdown AST & PDF** | Yes (`docs create`, `get --format md\|pdf`, `docs tabs`) | Raw JSON (`read_doc`, `update_doc`) | Raw JSON (`read_doc`, `update_doc`) | Plain-text append (`docs +write`) |
+| **Slides CLI & `.pptx` convert** | Yes (`create`, `get` MD, `inspect`, `replace`, `notes`, `--convert slides`) | Raw JSON + `read_slide_page_thumbnail` | Raw JSON + `read_slide_page_thumbnail` | Raw Discovery calls |
+| **Multimodal extraction** | Native Docs/Sheets/Slides only | Yes (`read_file_content` text/MD + comments) | Yes (`read_file_content` parses PDF, Office, PNG/JPEG) | Raw Discovery calls |
+| **Auth, Security & Telemetry** | Desktop OAuth (PKCE + AES-256-GCM, `--agentic` profiles); no preview gate; **zero telemetry** | Personal Mode onboarding, incremental/`--bundle=readonly` scopes, HITL elicitation, Model Armor; **telemetry on by default** (opt-out) | Developer Preview + `is_agentic` OAuth flag, Workspace DLP/governance, HITL elicitation | OS keychain AES-256-GCM, Service Accounts, Model Armor |
 
 </details>
 
@@ -68,7 +70,7 @@ A Go command-line interface (CLI) and Model Context Protocol (MCP) server for in
 - **Google Docs AST Conversion:** Convert local Markdown files into formatted Google Docs (`docs create`), export Google Docs back to Markdown, PDF, or plain text (`get --format md|pdf|txt`), and inspect document tab hierarchies (`docs tabs`).
 - **Google Sheets Operations:** Export sheets to CSV (`sheets get`), read cell ranges via A1 notation (`sheets get-range`), and update cell values (`sheets update-range`).
 - **Composable Recipes (`run`):** Execute sequential multi-step CLI workflows defined in JSON files.
-- **Dual-Mode MCP Server (`--mcp` / `--mcp-http`):** Expose native and Discovery-driven Google Workspace tools (`drive_v3_files_list`, `docs_v1_documents_get`, `sheets_v4_spreadsheets_get`) over stdio or HTTP.
+- **Dual-Mode MCP Server (`--mcp` / `--mcp-http`):** Expose 14 Discovery-driven Google Workspace tools (`drive.v3.files.*`, `docs.v1.documents.*`, `sheets.v4.spreadsheets.*`, `slides.v1.presentations.*`) and embedded query/A1 cheat-sheet resources over stdio or hardened loopback HTTP.
 
 ## Installation
 
@@ -333,7 +335,7 @@ Chain multiple `drivectl` commands in a declarative JSON recipe ([`recipes/sampl
 > [!NOTE]
 > Google now hosts official remote MCP servers for [Drive, Docs, Sheets, Slides, Gmail, Calendar, Chat, People, Classroom, and Universal Search](https://developers.google.com/workspace/guides/configure-mcp-servers#support-products). Prefer those managed endpoints when connecting AI agents directly to Workspace; use `drivectl --mcp` / `mcp.RegisterTools` when you need a local single-binary MCP server without Developer Preview enrollment or want to mount Discovery-backed tools inside a custom Go MCP host.
 
-`drivectl` includes a built-in Model Context Protocol (MCP) server (`github.com/modelcontextprotocol/go-sdk`) that exposes both native tools (`drivectl_list`, `drivectl_read`, `drivectl_call`) and dynamically generated Discovery tools (`drive_v3_files_list`, `docs_v1_documents_get`, `sheets_v4_spreadsheets_get`).
+`drivectl` includes a built-in Model Context Protocol (MCP) server (`github.com/modelcontextprotocol/go-sdk`) that registers 14 dynamically generated Discovery tools (`drive.v3.files.{list,get,create,update}`, `docs.v1.documents.{create,get,batchUpdate}`, `sheets.v4.spreadsheets.{create,get}`, `sheets.v4.spreadsheets.values.{get,update}`, `slides.v1.presentations.{create,get,batchUpdate}`) and 2 embedded cheat-sheet resources (`embedded:drive-query-cheat-sheet`, `embedded:a1-notation-cheat-sheet`).
 
 ```bash
 # Start MCP server over stdio (default for AI coding agents; auto-uses "agent" profile if configured)
