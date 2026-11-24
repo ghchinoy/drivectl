@@ -6,9 +6,36 @@
 
 A Go command-line interface (CLI) and Model Context Protocol (MCP) server for interacting with **Google Drive**, **Google Docs**, and **Google Sheets**, plus dynamic calls to any Google Workspace REST endpoint via Google API Discovery Documents. Built for both interactive terminal workflows and AI coding agents with deterministic JSON output (`-O json`), Markdown-to-Docs AST conversion, and multi-step JSON recipes.
 
+> [!IMPORTANT]
+> **Official Google Workspace CLI & Remote MCP Servers Available**
+>
+> Google now provides an official [Google Workspace CLI](https://developers.google.com/workspace/guides/workspace-cli) and hosted [Google Workspace Remote MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers#support-products) (Drive, Docs, Sheets, Slides, Gmail, Calendar, Chat, People, Classroom, and Universal Search).
+>
+> **Start with the official tools** for general Workspace automation, hosted MCP integrations, or multi-product workflows (Gmail, Calendar, Chat, Universal Search).
+>
+> **`drivectl` remains useful when you need:**
+> - An **embeddable Go library** (`pkg/drive`, `pkg/discovery`, `mcp.RegisterTools`) for stateless Cloud Run backends or custom Go MCP hosts
+> - **Markdown $\leftrightarrow$ Google Docs** AST conversion (`docs create`, `get --format md|pdf`)
+> - **Google Slides CLI ergonomics** (`slides get`, `inspect`, `replace`, `notes`, plus in-place `.pptx` $\rightarrow$ Slides conversion via `upload --convert slides --file-id`)
+> - **Drive revisions, comments, and Sheets CSV export** or a **single-binary local CLI/MCP** without Workspace Developer Preview enrollment
+
+<details>
+<summary><strong>Quick comparison: drivectl vs. official Workspace CLI &amp; Remote MCP</strong></summary>
+
+| Capability | `drivectl` | Official Remote MCP (`*mcp.googleapis.com`) | Workspace CLI (`gws`) |
+|---|---|---|---|
+| **Runtime** | Local Go binary (CLI + stdio/HTTP MCP) | Google-hosted remote Streamable HTTP | Local Rust binary + local MCP mode |
+| **Product breadth** | Drive, Docs, Sheets, Slides | 10 servers incl. Gmail, Calendar, Chat, Classroom, Universal Search | All Workspace Discovery APIs + `+workflow` helpers |
+| **Embeddable Go SDK** | Yes (`pkg/drive`, `pkg/discovery`, `mcp`) | No | No |
+| **Docs Markdown AST & PDF export** | Yes (`docs create`, `get --format md\|pdf`) | Raw JSON (`read_doc`, `update_doc`) | Plain-text append (`docs +write`) |
+| **Slides CLI & `.pptx` conversion** | Yes (`get`, `inspect`, `replace`, `notes`, `--convert slides`) | Raw JSON + `read_slide_page_thumbnail` | Raw Discovery calls |
+| **Multimodal file text extraction** | Native Docs/Sheets/Slides only | Yes (`read_file_content` parses PDF, Office, PNG/JPEG) | Raw Discovery calls |
+| **Auth & Governance** | Desktop OAuth (5 scopes); no preview gate | Developer Preview + `is_agentic` OAuth flag; Workspace DLP/governance | OS keychain AES-256-GCM, Service Accounts, Model Armor |
+
+</details>
+
 > [!NOTE]
-> - **Sister CLI (`share-with`):** Choose `drivectl` for Drive search, binary uploads, bidirectional Markdown $\leftrightarrow$ Google Docs AST conversion, Sheets A1 ranges, dynamic Discovery calls, and MCP server mode. For Google Drive ACL and sharing workflows, use [`share-with`](https://github.com/ghchinoy/share-with) ([docs](https://ghchinoy.github.io/share-with/)), which enforces silent-only permission grants (`sendNotificationEmail=false` at the HTTP transport layer), `?resourcekey=...` URL parsing, and pre-grant no-downgrade collaborator protection.
-> - **Ecosystem tools:** For broader Google Workspace integrations, also see the [Gemini CLI Workspace Extension](https://github.com/gemini-cli-extensions/workspace) and the [Google Workspace CLI (`gws`)](https://github.com/googleworkspace/cli).
+> **Sister CLI (`share-with`):** For dedicated Google Drive ACL and sharing workflows, use [`share-with`](https://github.com/ghchinoy/share-with) ([docs](https://ghchinoy.github.io/share-with/)), which enforces silent-only permission grants (`sendNotificationEmail=false` at the HTTP transport layer), `?resourcekey=...` URL parsing, and pre-grant no-downgrade collaborator protection. Also see the [Gemini CLI Workspace Extension](https://github.com/gemini-cli-extensions/workspace).
 
 ## Table of Contents
 
@@ -292,6 +319,9 @@ Chain multiple `drivectl` commands in a declarative JSON recipe ([`recipes/sampl
 ```
 
 ## MCP Server Mode
+
+> [!NOTE]
+> Google now hosts official remote MCP servers for [Drive, Docs, Sheets, Slides, Gmail, Calendar, Chat, People, Classroom, and Universal Search](https://developers.google.com/workspace/guides/configure-mcp-servers#support-products). Prefer those managed endpoints when connecting AI agents directly to Workspace; use `drivectl --mcp` / `mcp.RegisterTools` when you need a local single-binary MCP server without Developer Preview enrollment or want to mount Discovery-backed tools inside a custom Go MCP host.
 
 `drivectl` includes a built-in Model Context Protocol (MCP) server (`github.com/modelcontextprotocol/go-sdk`) that exposes both native tools (`drivectl_list`, `drivectl_read`, `drivectl_call`) and dynamically generated Discovery tools (`drive_v3_files_list`, `docs_v1_documents_get`, `sheets_v4_spreadsheets_get`).
 

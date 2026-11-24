@@ -68,11 +68,18 @@ const installMethods = [
 ];
 ---
 
+<aside class="wrap notice" aria-label="Official Google Workspace CLI and MCP servers">
+  <span class="notice-badge">Official tools</span>
+  <p>
+    Google now offers the <a href="https://developers.google.com/workspace/guides/workspace-cli">Google Workspace CLI</a> and hosted <a href="https://developers.google.com/workspace/guides/configure-mcp-servers#support-products">Remote MCP servers</a>. Start there for general Workspace automation; use <code>drivectl</code> for its embeddable Go library, Markdown ↔ Docs AST conversion, Slides <code>.pptx</code>/notes helpers, or local single-binary workflows.
+  </p>
+</aside>
+
 <section class="wrap hero">
   <div class="introduction">
     <h1>drivectl</h1>
     <p class="lead">
-      A Go CLI and Model Context Protocol (MCP) server for Google Drive, Google Docs, and Google Sheets. Combine ergonomic native subcommands with dynamic Google API Discovery for interactive shells and AI coding agents.
+      A Go CLI and Model Context Protocol (MCP) server for Google Drive, Google Docs, Google Sheets, and Google Slides. Combine ergonomic native subcommands with dynamic Google API Discovery for interactive shells and AI coding agents.
     </p>
     <div class="actions">
       <Button color="outlined" size="md" href={`${base}/install`}>Install</Button>
@@ -224,7 +231,11 @@ const installMethods = [
   .explanation > a { display: inline-block; margin-top: 4px; }
   .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; margin-top: 32px; }
 
-  .hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 72px; align-items: start; padding-block: 64px 72px; }
+  .notice { display: flex; align-items: baseline; gap: 14px; margin-top: 24px; padding: 14px 18px; border: 1px solid var(--md-sys-color-outline-variant); border-inline-start: 3px solid var(--egm-color-elephant); border-radius: 10px; background: var(--md-sys-color-surface-container-low); }
+  .notice-badge { flex: none; padding: 2px 8px; border-radius: 999px; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); font: var(--md-sys-typescale-label-md); letter-spacing: var(--md-sys-typescale-label-md-tracking); text-transform: uppercase; }
+  .notice p { margin: 0; font-size: .9375rem; line-height: 1.6; color: var(--md-sys-color-on-surface); }
+
+  .hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 72px; align-items: start; padding-block: 48px 72px; }
   .lead { max-width: 55ch; margin-top: 20px; line-height: 1.7; text-wrap: pretty; }
 
   .handoff { margin: 0; }
@@ -278,9 +289,10 @@ const installMethods = [
 
   @media(max-width:900px) { .hero { gap: 40px; } .starting-points { column-gap: 48px; } }
   @media(max-width:760px) {
+    .notice { flex-direction: column; align-items: flex-start; gap: 8px; }
     .hero, .starting-points { grid-template-columns: 1fr; gap: 40px; }
     .findings { grid-template-columns: 1fr; }
-    .hero { padding-block: 48px 56px; }
+    .hero { padding-block: 36px 56px; }
     .example, .starting-points, .install { padding-block: 48px 56px; }
     .sheet { padding: 24px; }
   }
