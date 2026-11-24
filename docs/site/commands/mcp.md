@@ -17,15 +17,17 @@ Google now offers hosted remote MCP servers for [Drive, Docs, Sheets, Slides, Gm
 drivectl --mcp
 ```
 
-### HTTP transport (Streamable HTTP + SSE)
+### HTTP transport (Streamable HTTP)
 
 ```sh
+# Defaults hostless addresses (":8080") to 127.0.0.1:8080 with Origin validation
 drivectl --mcp-http :8080
+
+# Require Bearer token authentication on HTTP MCP requests
+DRIVECTL_MCP_AUTH_TOKEN="your-secret-token" drivectl --mcp-http 127.0.0.1:8080
 ```
 
-In HTTP mode, `drivectl` exposes:
-- `/mcp` — Streamable HTTP MCP endpoint
-- `/sse` and `/messages` — Server-Sent Events compatibility endpoints
+In HTTP mode, `drivectl` binds `127.0.0.1` by default, rejects non-loopback browser `Origin` headers (preventing DNS rebinding), and enforces `Authorization: Bearer <token>` whenever `DRIVECTL_MCP_AUTH_TOKEN` is set. When a dedicated `agent` profile (created via `drivectl auth login --agentic`) or `DRIVECTL_AGENT_SECRETS` is present, MCP mode selects it automatically.
 
 ## Registered MCP tools
 

@@ -266,6 +266,37 @@ func TestCopySecretFile(t *testing.T) {
 	}
 }
 
+func TestResolveLoginProfile(t *testing.T) {
+	if got := resolveLoginProfile("", false); got != "default" {
+		t.Errorf("resolveLoginProfile(\"\", false) = %q, want default", got)
+	}
+	if got := resolveLoginProfile("", true); got != "agent" {
+		t.Errorf("resolveLoginProfile(\"\", true) = %q, want agent", got)
+	}
+	if got := resolveLoginProfile("custom", true); got != "custom" {
+		t.Errorf("resolveLoginProfile(\"custom\", true) = %q, want custom", got)
+	}
+}
+
+func TestAuthStatusAndLogoutCommands(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("DRIVECTL_PROFILE", "")
+
+	oldClient := client
+	client = nil
+	t.Cleanup(func() { client = oldClient })
+
+	rootCmd.SetArgs([]string{"auth", "status", "-O", "json"})
+	if err := ExecuteContext(t.Context()); err != nil {
+		t.Fatalf("auth status -O json error = %v", err)
+	}
+
+	rootCmd.SetArgs([]string{"auth", "logout", "--profile", "agent"})
+	if err := ExecuteContext(t.Context()); err != nil {
+		t.Fatalf("auth logout --profile agent error = %v", err)
+	}
+}
+
 type cmdRoundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f cmdRoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {

@@ -66,14 +66,20 @@ var rootCmd = &cobra.Command{
 It allows you to list, describe, and download files, with advanced support for
 Google Docs, including exporting to multiple formats and accessing individual tabs.`,
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-		if cmd.Name() == "login" || cmd.Name() == "auth" || cmd.Name() == "help" {
+		if isAuthBypassCommand(cmd) {
 			return nil
 		}
 		ctx := cmd.Context()
 		var err error
 		if client == nil {
+			profile := viper.GetString("profile")
 			secretFile := viper.GetString("secret-file")
-			client, err = drive.NewOAuthClient(ctx, secretFile, noBrowserAuth)
+			client, err = drive.NewOAuthClientWithOptions(ctx, drive.AuthOptions{
+				SecretFile:    secretFile,
+				Profile:       profile,
+				NoBrowserAuth: noBrowserAuth,
+				UserAgent:     fmt.Sprintf("drivectl/%s", Version),
+			})
 			if err != nil {
 				wrapped := fmt.Errorf("could not create oauth client: %w", err)
 				return ui.ErrorWithHint(wrapped, "run 'drivectl auth login' to authenticate")
@@ -90,6 +96,16 @@ Google Docs, including exporting to multiple formats and accessing individual ta
 		slidesSvc = svcs.Slides
 		return nil
 	},
+}
+
+func isAuthBypassCommand(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		switch c.Name() {
+		case "auth", "help", "completion":
+			return true
+		}
+	}
+	return false
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -115,12 +131,15 @@ func init() {
 
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().String("secret-file", "", "path to your client secrets file")
+	rootCmd.PersistentFlags().String("profile", "", "authentication profile name (default: \"default\"; use \"agent\" for AI agent OAuth clients)")
 	rootCmd.PersistentFlags().StringVarP(&OutputFormat, "output-format", "O", "", "output format (e.g. json)")
 	rootCmd.PersistentFlags().BoolVar(&noBrowserAuth, "no-browser-auth", false, "do not open a browser for authentication")
 	rootCmd.PersistentFlags().Bool("mcp", false, "enable MCP server mode over stdio")
-	rootCmd.PersistentFlags().String("mcp-http", "", "enable MCP server mode over HTTP at the given address")
+	rootCmd.PersistentFlags().String("mcp-http", "", "enable MCP server mode over HTTP at the given address (defaults to 127.0.0.1)")
 	_ = viper.BindPFlag("secret-file", rootCmd.PersistentFlags().Lookup("secret-file"))
 	_ = viper.BindEnv("secret-file", "DRIVE_SECRETS")
+	_ = viper.BindPFlag("profile", rootCmd.PersistentFlags().Lookup("profile"))
+	_ = viper.BindEnv("profile", "DRIVECTL_PROFILE")
 	_ = viper.BindPFlag("mcp", rootCmd.PersistentFlags().Lookup("mcp"))
 	_ = viper.BindPFlag("mcp-http", rootCmd.PersistentFlags().Lookup("mcp-http"))
 }

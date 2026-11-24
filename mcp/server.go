@@ -25,7 +25,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -102,19 +101,23 @@ func Start(ctx context.Context, _ *cobra.Command, httpAddr string) error {
 	}
 
 	if httpAddr != "" {
-		handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
+		bindAddr := normalizeMCPHTTPAddr(httpAddr)
+		authToken := strings.TrimSpace(os.Getenv(mcpAuthTokenEnvVar))
+		logNonLoopbackWarning(bindAddr, authToken)
+
+		baseHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 			return server
 		}, nil)
 		srv := &http.Server{
-			Addr:              httpAddr,
-			Handler:           handler,
+			Addr:              bindAddr,
+			Handler:           wrapMCPHTTPSecurity(baseHandler, authToken),
 			ReadHeaderTimeout: 10 * time.Second,
 		}
 		go func() {
 			<-ctx.Done()
 			_ = srv.Shutdown(context.WithoutCancel(ctx))
 		}()
-		log.Printf("MCP handler listening at %s", httpAddr)
+		log.Printf("MCP handler listening at %s", bindAddr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return err
 		}
@@ -188,17 +191,41 @@ func registerToolsAndResources(ctx context.Context, server *mcp.Server) error {
 	return RegisterTools(ctx, server, apiClientFactory, WithDiscoveryHTTPClient(discoveryHTTPClient))
 }
 
-func newHTTPClient(ctx context.Context) (*http.Client, error) {
+func resolveMCPProfileAndSecret() (profile, secretFile string) {
 	viper.AutomaticEnv()
-	secretFile := viper.GetString("secret-file")
-	if secretFile == "" {
-		configDir, err := drive.ConfigDir()
-		if err == nil {
-			secretFile = filepath.Join(configDir, "client_secret.json")
+	profile = strings.TrimSpace(viper.GetString("profile"))
+	secretFile = strings.TrimSpace(viper.GetString("secret-file"))
+
+	if profile == "" {
+		if agentSecret := strings.TrimSpace(os.Getenv("DRIVECTL_AGENT_SECRETS")); agentSecret != "" {
+			return drive.AgentProfile, agentSecret
 		}
+		if agentPath, err := drive.ProfileSecretFile(drive.AgentProfile); err == nil {
+			if _, statErr := os.Stat(agentPath); statErr == nil {
+				return drive.AgentProfile, agentPath
+			}
+		}
+		profile = drive.DefaultProfile
 	}
-	noBrowserAuth := viper.GetBool("no-browser-auth")
-	client, err := drive.NewOAuthClient(ctx, secretFile, noBrowserAuth)
+
+	return profile, secretFile
+}
+
+func newHTTPClient(ctx context.Context) (*http.Client, error) {
+	profile, secretFile := resolveMCPProfileAndSecret()
+	meta, _ := drive.LoadProfileMetadata(profile)
+	if !meta.Agentic {
+		log.Printf("Note: MCP server is using non-agentic OAuth profile %q. Run 'drivectl auth login --agentic --secret-file <agent_client_secret.json>' to configure a dedicated agentic OAuth client.", profile)
+	}
+
+	userAgent := fmt.Sprintf("drivectl (mcp; profile=%s; agentic=%t)", profile, meta.Agentic)
+	client, err := drive.NewOAuthClientWithOptions(ctx, drive.AuthOptions{
+		SecretFile:    secretFile,
+		Profile:       profile,
+		Agentic:       meta.Agentic,
+		NoBrowserAuth: viper.GetBool("no-browser-auth"),
+		UserAgent:     userAgent,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not create oauth client: %w", err)
 	}

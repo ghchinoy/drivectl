@@ -17,9 +17,14 @@ package drive
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -34,6 +39,17 @@ import (
 	"google.golang.org/api/sheets/v4"
 	"google.golang.org/api/slides/v1"
 )
+
+// DefaultOAuthScopes returns the standard set of Google Workspace OAuth scopes requested by drivectl.
+func DefaultOAuthScopes() []string {
+	return []string{
+		drive.DriveReadonlyScope,
+		docs.DocumentsReadonlyScope,
+		sheets.SpreadsheetsScope,
+		slides.PresentationsScope,
+		drive.DriveFileScope,
+	}
+}
 
 // Services bundles pre-configured Google Workspace API clients sharing an HTTP client.
 type Services struct {
@@ -136,14 +152,28 @@ func ConfigDir() (string, error) {
 	return configDir, nil
 }
 
-// NewOAuthClient creates a new HTTP client with OAuth 2.0 authentication.
+// NewOAuthClient creates a new HTTP client with OAuth 2.0 authentication using the default profile.
 func NewOAuthClient(ctx context.Context, secretFile string, noBrowserAuth bool) (*http.Client, error) {
+	return NewOAuthClientWithOptions(ctx, AuthOptions{
+		SecretFile:    secretFile,
+		Profile:       DefaultProfile,
+		NoBrowserAuth: noBrowserAuth,
+	})
+}
+
+// NewOAuthClientWithOptions creates a profile-aware HTTP client with OAuth 2.0 authentication.
+func NewOAuthClientWithOptions(ctx context.Context, opts AuthOptions) (*http.Client, error) {
+	profile, err := NormalizeProfile(opts.Profile)
+	if err != nil {
+		return nil, err
+	}
+
+	secretFile := opts.SecretFile
 	if secretFile == "" {
-		configDir, err := ConfigDir()
+		secretFile, err = ProfileSecretFile(profile)
 		if err != nil {
 			return nil, err
 		}
-		secretFile = filepath.Join(configDir, "client_secret.json")
 	}
 
 	b, err := os.ReadFile(secretFile)
@@ -151,28 +181,33 @@ func NewOAuthClient(ctx context.Context, secretFile string, noBrowserAuth bool) 
 		return nil, fmt.Errorf("unable to read client secret file at %q: %w", secretFile, err)
 	}
 
-	config, err := google.ConfigFromJSON(
-		b,
-		drive.DriveReadonlyScope,
-		docs.DocumentsReadonlyScope,
-		sheets.SpreadsheetsScope,
-		slides.PresentationsScope,
-		drive.DriveFileScope,
-	)
+	config, err := google.ConfigFromJSON(b, DefaultOAuthScopes()...)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse client secret file to config: %w", err)
 	}
 
-	return FetchClient(ctx, config, noBrowserAuth)
+	cacheFile, err := ProfileTokenCacheFile(profile)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get path to cached credential file: %w", err)
+	}
+
+	client, err := fetchClientWithCache(ctx, config, cacheFile, opts.NoBrowserAuth)
+	if err != nil {
+		return nil, err
+	}
+	return WrapHTTPClientUserAgent(client, opts.UserAgent), nil
 }
 
-// FetchClient retrieves a token from a local file or the web, then returns an authenticated HTTP client.
+// FetchClient retrieves a token from the default local cache or the web, then returns an authenticated HTTP client.
 func FetchClient(ctx context.Context, config *oauth2.Config, noBrowserAuth bool) (*http.Client, error) {
 	cacheFile, err := TokenCacheFile()
 	if err != nil {
 		return nil, fmt.Errorf("unable to get path to cached credential file: %w", err)
 	}
+	return fetchClientWithCache(ctx, config, cacheFile, noBrowserAuth)
+}
 
+func fetchClientWithCache(ctx context.Context, config *oauth2.Config, cacheFile string, noBrowserAuth bool) (*http.Client, error) {
 	tok, err := TokenFromFile(cacheFile)
 	if err != nil {
 		tok, err = fetchOAuthToken(ctx, config, noBrowserAuth)
@@ -182,26 +217,43 @@ func FetchClient(ctx context.Context, config *oauth2.Config, noBrowserAuth bool)
 		if err := SaveToken(cacheFile, tok); err != nil {
 			return nil, err
 		}
+	} else if !InspectTokenFile(cacheFile).Encrypted {
+		// Upgrade legacy plaintext token cache in place to AES-256-GCM.
+		_ = SaveToken(cacheFile, tok)
 	}
-	return config.Client(ctx, tok), nil
+
+	ts := newPersistingTokenSource(config.TokenSource(ctx, tok), cacheFile, tok)
+	return oauth2.NewClient(ctx, ts), nil
 }
 
-// FetchTokenFromWebWithBrowser uses a local web server to handle the OAuth 2.0 callback flow.
+// FetchTokenFromWebWithBrowser uses an ephemeral loopback web server with PKCE (S256)
+// and CSRF state verification to handle the OAuth 2.0 callback flow.
 func FetchTokenFromWebWithBrowser(ctx context.Context, config *oauth2.Config) (*oauth2.Token, error) {
-	config.RedirectURL = "http://localhost:8080"
-	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
-
-	fmt.Fprintln(os.Stderr, "Your browser has been opened to visit:", authURL)
-	if err := browser.OpenURL(authURL); err != nil {
-		return nil, fmt.Errorf("failed to open browser: %w", err)
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, fmt.Errorf("failed to start local OAuth callback listener: %w", err)
 	}
+	defer ln.Close()
+
+	state, err := generateOAuthState()
+	if err != nil {
+		return nil, err
+	}
+	verifier := oauth2.GenerateVerifier()
+
+	cfgCopy := *config
+	cfgCopy.RedirectURL = fmt.Sprintf("http://%s", ln.Addr().String())
+	authURL := cfgCopy.AuthCodeURL(
+		state,
+		oauth2.AccessTypeOffline,
+		oauth2.S256ChallengeOption(verifier),
+	)
 
 	codeChan := make(chan string, 1)
 	errChan := make(chan error, 1)
 
 	srv := &http.Server{
-		Addr:              ":8080",
-		Handler:           newOAuthCallbackHandler(codeChan, errChan),
+		Handler:           newOAuthCallbackHandler(state, codeChan, errChan),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	defer func() {
@@ -209,24 +261,39 @@ func FetchTokenFromWebWithBrowser(ctx context.Context, config *oauth2.Config) (*
 	}()
 
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			sendNonBlockingErr(errChan, err)
 		}
 	}()
+
+	fmt.Fprintln(os.Stderr, "Your browser has been opened to visit:", authURL)
+	if err := browser.OpenURL(authURL); err != nil {
+		return nil, fmt.Errorf("failed to open browser: %w", err)
+	}
 
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case code := <-codeChan:
-		return config.Exchange(ctx, code)
+		return cfgCopy.Exchange(ctx, code, oauth2.VerifierOption(verifier))
 	case err := <-errChan:
-		return nil, fmt.Errorf("failed to start local server or get code: %w", err)
+		return nil, fmt.Errorf("OAuth callback failed: %w", err)
 	}
 }
 
-// FetchTokenFromWeb requests an OAuth 2.0 token from the web via manual terminal code entry.
+// FetchTokenFromWeb requests an OAuth 2.0 token from the web via manual terminal code entry using PKCE (S256).
 func FetchTokenFromWeb(ctx context.Context, config *oauth2.Config) (*oauth2.Token, error) {
-	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	state, err := generateOAuthState()
+	if err != nil {
+		return nil, err
+	}
+	verifier := oauth2.GenerateVerifier()
+
+	authURL := config.AuthCodeURL(
+		state,
+		oauth2.AccessTypeOffline,
+		oauth2.S256ChallengeOption(verifier),
+	)
 	fmt.Fprintf(os.Stderr, "Go to the following link in your browser then type the authorization code: \n%v\n", authURL)
 
 	var authCode string
@@ -234,46 +301,67 @@ func FetchTokenFromWeb(ctx context.Context, config *oauth2.Config) (*oauth2.Toke
 		return nil, fmt.Errorf("unable to read authorization code: %w", err)
 	}
 
-	tok, err := config.Exchange(ctx, authCode)
+	tok, err := config.Exchange(ctx, authCode, oauth2.VerifierOption(verifier))
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve token from web: %w", err)
 	}
 	return tok, nil
 }
 
-// TokenCacheFile returns the path to the token cache file.
+// TokenCacheFile returns the path to the default profile's token cache file.
 func TokenCacheFile() (string, error) {
-	configDir, err := ConfigDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(configDir, "token.json"), nil
+	return ProfileTokenCacheFile(DefaultProfile)
 }
 
-// TokenFromFile retrieves a cached OAuth 2.0 token from a file.
+// TokenFromFile retrieves a cached OAuth 2.0 token from a file, transparently decrypting
+// AES-256-GCM envelopes and remaining backwards-compatible with legacy plaintext token files.
 func TokenFromFile(file string) (*oauth2.Token, error) {
-	f, err := os.Open(file)
+	raw, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+
+	var env encryptedTokenEnvelope
+	if err := json.Unmarshal(raw, &env); err == nil && env.Format == encryptedTokenFormat {
+		key, err := loadOrCreateEncryptionKey(filepath.Dir(file))
+		if err != nil {
+			return nil, err
+		}
+		raw, err = decryptTokenEnvelope(env, key)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	tok := &oauth2.Token{}
-	err = json.NewDecoder(f).Decode(tok)
-	return tok, err
+	if err := json.Unmarshal(raw, tok); err != nil {
+		return nil, fmt.Errorf("parsing cached token %q: %w", file, err)
+	}
+	return tok, nil
 }
 
-// SaveToken saves an OAuth 2.0 token to a file with restricted permissions.
+// SaveToken encrypts an OAuth 2.0 token with AES-256-GCM and writes it atomically with 0600 permissions.
 func SaveToken(file string, token *oauth2.Token) error {
-	fmt.Fprintf(os.Stderr, "Saving credential file to: %s\n", file)
-	f, err := os.OpenFile(file, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+	fmt.Fprintf(os.Stderr, "Saving encrypted credential file to: %s\n", file)
+	plaintext, err := json.Marshal(token)
 	if err != nil {
+		return fmt.Errorf("encoding oauth token: %w", err)
+	}
+
+	key, err := loadOrCreateEncryptionKey(filepath.Dir(file))
+	if err != nil {
+		return fmt.Errorf("loading token encryption key: %w", err)
+	}
+
+	encrypted, err := encryptTokenBytes(plaintext, key)
+	if err != nil {
+		return fmt.Errorf("encrypting oauth token: %w", err)
+	}
+
+	if err := writeFileAtomic(file, append(encrypted, '\n'), 0o600); err != nil {
 		return fmt.Errorf("unable to cache oauth token: %w", err)
 	}
-	err = json.NewEncoder(f).Encode(token)
-	if closeErr := f.Close(); err == nil {
-		err = closeErr
-	}
-	return err
+	return nil
 }
 
 func fetchOAuthToken(ctx context.Context, config *oauth2.Config, noBrowserAuth bool) (*oauth2.Token, error) {
@@ -283,15 +371,37 @@ func fetchOAuthToken(ctx context.Context, config *oauth2.Config, noBrowserAuth b
 	return FetchTokenFromWebWithBrowser(ctx, config)
 }
 
-func newOAuthCallbackHandler(codeChan chan<- string, errChan chan<- error) http.Handler {
+func generateOAuthState() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, buf); err != nil {
+		return "", fmt.Errorf("generating OAuth CSRF state: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(buf), nil
+}
+
+func newOAuthCallbackHandler(expectedState string, codeChan chan<- string, errChan chan<- error) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if oauthErr := r.URL.Query().Get("error"); oauthErr != "" {
+			http.Error(w, "Authorization denied.", http.StatusBadRequest)
+			sendNonBlockingErr(errChan, fmt.Errorf("authorization error from Google: %s", oauthErr))
+			return
+		}
+
+		gotState := r.URL.Query().Get("state")
+		if expectedState == "" || subtle.ConstantTimeCompare([]byte(gotState), []byte(expectedState)) != 1 {
+			http.Error(w, "Invalid OAuth state parameter.", http.StatusBadRequest)
+			sendNonBlockingErr(errChan, errors.New("OAuth state mismatch (possible CSRF)"))
+			return
+		}
+
 		code := r.URL.Query().Get("code")
 		if code == "" {
-			fmt.Fprintln(w, "Invalid request. No authorization code received.")
+			http.Error(w, "Invalid request. No authorization code received.", http.StatusBadRequest)
 			sendNonBlockingErr(errChan, errors.New("no code in request"))
 			return
 		}
+
 		fmt.Fprintln(w, "Authentication successful! You can close this browser window.")
 		select {
 		case codeChan <- code:

@@ -10,17 +10,20 @@ If you have not created a Desktop OAuth 2.0 `client_secret.json` yet, follow [Co
 Pass your `client_secret.json` file to `drivectl auth login` on your first run, or set the `DRIVE_SECRETS` environment variable:
 
 ```sh
-# Pass the secret file via flag
+# Pass the secret file via flag (default profile)
 drivectl auth login --secret-file /path/to/client_secret.json
 
-# Or via the DRIVE_SECRETS environment variable
-DRIVE_SECRETS=/path/to/client_secret.json drivectl auth login
+# Dedicated agentic OAuth profile (for clients marked "Use this client for an AI-powered agent")
+drivectl auth login --agentic --secret-file /path/to/agent_client_secret.json
+
+# Inspect profile, encryption status, and token expiry
+drivectl auth status
 ```
 
-`drivectl` caches your client secret (`client_secret.json`) and OAuth token (`token.json`) in `~/.config/drivectl/` and refreshes access tokens automatically on subsequent runs. When resolving the secret path, `--secret-file` takes precedence over `DRIVE_SECRETS`, which takes precedence over `~/.config/drivectl/client_secret.json`.
+`drivectl` caches your client secret (`client_secret.json`) and AES-256-GCM encrypted OAuth token (`token.json`) in `~/.config/drivectl/` (or `~/.config/drivectl/profiles/<name>/` for named profiles) and persists refreshed tokens automatically. When resolving the secret path, `--secret-file` takes precedence over `DRIVE_SECRETS`, which takes precedence over the profile's cached `client_secret.json`.
 
-:::note[Local OAuth callback on `http://localhost:8080`]
-During default browser-based login, `drivectl` opens your browser and starts a temporary local HTTP listener on `http://localhost:8080` to receive the authorization callback. Make sure port `8080` is free while authenticating (for example, stop any local dev server or `drivectl --mcp-http :8080` first).
+:::note[Ephemeral loopback OAuth callback & PKCE]
+During default browser-based login, `drivectl` binds an ephemeral loopback port (`127.0.0.1:0`) with PKCE (`S256`) and cryptographic CSRF `state` verification—no fixed port `8080` conflicts. Cached tokens are encrypted at rest with AES-256-GCM (`.encryption_key` with `0600` permissions, or `DRIVECTL_ENCRYPTION_KEY`).
 :::
 
 If you are working on a remote or headless machine without a local browser, pass `--no-browser-auth` to print an authorization URL you can open on any device:
