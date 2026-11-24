@@ -178,6 +178,8 @@ func RegisterTools(ctx context.Context, server *mcp.Server, clientProvider Clien
 		URI:         "embedded:a1-notation-cheat-sheet",
 	}, a1NotationCheatSheetHandler)
 
+	registerNativeTools(server, clientProvider)
+
 	docsCache := make(map[string]*discovery.RestDescription)
 
 	for _, endpoint := range dynamicTools {
@@ -305,6 +307,7 @@ func registerDynamicEndpoint(
 		Name:        endpoint,
 		Description: method.Description,
 		InputSchema: schema,
+		Annotations: discoveryToolAnnotations(endpoint, method.HTTPMethod),
 	}
 
 	mcp.AddTool(server, mcpTool, func(ctx context.Context, _ *mcp.CallToolRequest, args map[string]any) (*mcp.CallToolResult, any, error) {

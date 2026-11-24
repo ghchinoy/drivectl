@@ -66,7 +66,11 @@ Example:
 		resourcePath := parts[2 : len(parts)-1]
 
 		ctx := cmd.Context()
-		doc, err := discovery.FetchDiscoveryDocument(ctx, client, serviceName, version)
+		httpClient := client
+		if httpClient == nil {
+			httpClient = http.DefaultClient
+		}
+		doc, err := discovery.FetchDiscoveryDocument(ctx, httpClient, serviceName, version)
 		if err != nil {
 			wrapped := fmt.Errorf("failed to fetch discovery document: %w", err)
 			return ui.ErrorWithHint(wrapped, "Ensure your network is active and the API service/version exist.")
@@ -87,7 +91,11 @@ Example:
 			return err
 		}
 
-		resp, err := client.Do(req)
+		if dryRun {
+			return previewHTTPRequest("call "+path, req)
+		}
+
+		resp, err := httpClient.Do(req)
 		if err != nil {
 			wrapped := fmt.Errorf("executing API request: %w", err)
 			return ui.ErrorWithHint(wrapped, "Check your network connection and payload formatting.")

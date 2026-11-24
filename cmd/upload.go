@@ -17,6 +17,11 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -59,6 +64,9 @@ URL and permissions), a remote --name, a --parent folder ID, an explicit --mime-
 			ParentID: parentID,
 			MimeType: targetMime,
 		}
+		if dryRun {
+			return previewUploadDryRun(filePath, opts)
+		}
 		uploadedFile, err := drive.UploadFileWithOptions(driveSvc, filePath, opts)
 		if err != nil {
 			return ui.ErrorWithHint(err, "Ensure the file path is correct and you have permission to upload.")
@@ -94,6 +102,47 @@ func resolveUploadMimeType(explicitMime, convertTarget string) (string, error) {
 		return drive.ResolveConvertMimeType(convertTarget)
 	}
 	return explicitMime, nil
+}
+
+func previewUploadDryRun(filePath string, opts drive.UploadOptions) error {
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return ui.ErrorWithHint(fmt.Errorf("unable to stat local file %q: %w", filePath, err), "Ensure the file path is correct.")
+	}
+
+	remoteName := opts.Name
+	if remoteName == "" {
+		remoteName = filepath.Base(filePath)
+		if uploadConvert != "" {
+			remoteName = strings.TrimSuffix(remoteName, filepath.Ext(remoteName))
+		}
+	}
+
+	method := http.MethodPost
+	endpoint := "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,webViewLink"
+	if opts.FileID != "" {
+		method = http.MethodPatch
+		endpoint = fmt.Sprintf("https://www.googleapis.com/upload/drive/v3/files/%s?uploadType=multipart&fields=id,name,mimeType,webViewLink", url.PathEscape(opts.FileID))
+	}
+
+	metadata := map[string]any{"name": remoteName}
+	if opts.MimeType != "" {
+		metadata["mimeType"] = opts.MimeType
+	}
+	if opts.ParentID != "" && opts.FileID == "" {
+		metadata["parents"] = []string{opts.ParentID}
+	}
+
+	return printDryRunPlan(dryRunPlan{
+		Command: "upload",
+		Method:  method,
+		URL:     endpoint,
+		Payload: map[string]any{
+			"metadata":  metadata,
+			"localFile": filePath,
+			"sizeBytes": info.Size(),
+		},
+	})
 }
 
 func init() {

@@ -17,6 +17,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
@@ -80,6 +81,26 @@ var docsCreateCmd = &cobra.Command{
 		if err != nil {
 			wrapped := fmt.Errorf("unable to read markdown file %q: %w", markdownFile, err)
 			return ui.ErrorWithHint(wrapped, "Ensure the path to the markdown file is correct.")
+		}
+
+		if dryRun {
+			reqs, err := drive.MarkdownToDocsRequests(string(content))
+			if err != nil {
+				return ui.ErrorWithHint(err, "Check Markdown syntax in the input file.")
+			}
+			return printDryRunPlan(dryRunPlan{
+				Command: "docs create",
+				Method:  http.MethodPost,
+				URL:     "https://docs.googleapis.com/v1/documents",
+				Payload: map[string]any{
+					"create":             map[string]any{"title": title},
+					"batchUpdateCount":   len(reqs),
+					"batchUpdatePreview": reqs,
+				},
+				Notes: []string{
+					fmt.Sprintf("Step 2 would POST %d AST formatting request(s) to https://docs.googleapis.com/v1/documents/{documentId}:batchUpdate.", len(reqs)),
+				},
+			})
 		}
 
 		doc, err := drive.CreateDocFromMarkdown(docsSvc, title, string(content))

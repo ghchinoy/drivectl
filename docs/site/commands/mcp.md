@@ -31,14 +31,18 @@ In HTTP mode, `drivectl` binds `127.0.0.1` by default, rejects non-loopback brow
 
 ## Registered MCP tools & resources
 
-When the server starts, `mcp.RegisterTools` mounts 14 Discovery-generated Google Workspace tools and 2 embedded resources:
+When the server starts, `mcp.RegisterTools` mounts **22 tools** (all populated with MCP `ToolAnnotations` — `ReadOnlyHint`, `DestructiveHint`, `IdempotentHint`, and `OpenWorldHint`) and 2 embedded resources:
 
-1. **Dynamic Discovery tools:**
+1. **Native Workspace workflow tools (8):**
+   - **Docs:** `drivectl_docs_create_from_markdown` (Markdown → Google Docs AST), `drivectl_docs_export_markdown` (Doc/tab → Markdown), `drivectl_docs_tabs` (hierarchical tab tree)
+   - **Sheets:** `drivectl_sheets_export_csv` (RFC 4180 CSV export)
+   - **Slides:** `drivectl_slides_get_markdown` (deck + speaker notes as Markdown), `drivectl_slides_inspect` (`objectId` outline), `drivectl_slides_update_notes` (replace speaker notes), `drivectl_slides_replace_text` (`replaceAllText`)
+2. **Dynamic Discovery tools (14):**
    - **Drive:** `drive.v3.files.list`, `drive.v3.files.get`, `drive.v3.files.create`, `drive.v3.files.update`
    - **Docs:** `docs.v1.documents.create`, `docs.v1.documents.get`, `docs.v1.documents.batchUpdate`
    - **Sheets:** `sheets.v4.spreadsheets.create`, `sheets.v4.spreadsheets.get`, `sheets.v4.spreadsheets.values.get`, `sheets.v4.spreadsheets.values.update`
    - **Slides:** `slides.v1.presentations.create`, `slides.v1.presentations.get`, `slides.v1.presentations.batchUpdate`
-2. **Embedded resources:**
+3. **Embedded resources (2):**
    - `embedded:drive-query-cheat-sheet` — common Google Drive `q` filter examples.
    - `embedded:a1-notation-cheat-sheet` — Google Sheets A1 cell range reference.
 

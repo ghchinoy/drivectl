@@ -17,6 +17,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -158,6 +160,19 @@ var sheetsUpdateRangeCmd = &cobra.Command{
 		spreadsheetID := args[0]
 		value := args[1]
 		values := [][]any{{value}}
+		if dryRun {
+			fullRange := fmt.Sprintf("%s!%s", sheetName, sheetRange)
+			endpoint := fmt.Sprintf("https://sheets.googleapis.com/v4/spreadsheets/%s/values/%s?valueInputOption=USER_ENTERED", url.PathEscape(spreadsheetID), url.PathEscape(fullRange))
+			return printDryRunPlan(dryRunPlan{
+				Command: "sheets update-range",
+				Method:  http.MethodPut,
+				URL:     endpoint,
+				Payload: map[string]any{
+					"range":  fullRange,
+					"values": values,
+				},
+			})
+		}
 		err := drive.UpdateSheetRange(sheetsSvc, spreadsheetID, sheetName, sheetRange, values)
 		if err != nil {
 			return ui.ErrorWithHint(err, "Verify the A1 notation of the range and that you have write permissions.")

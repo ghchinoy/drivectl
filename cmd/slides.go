@@ -17,6 +17,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
 	"strings"
 
@@ -74,6 +76,14 @@ var slidesCreateCmd = &cobra.Command{
 	Args: cobra.ExactArgs(1),
 	RunE: func(_ *cobra.Command, args []string) error {
 		title := args[0]
+		if dryRun {
+			return printDryRunPlan(dryRunPlan{
+				Command: "slides create",
+				Method:  http.MethodPost,
+				URL:     "https://slides.googleapis.com/v1/presentations",
+				Payload: map[string]any{"title": title},
+			})
+		}
 
 		pres, err := drive.CreatePresentation(slidesSvc, title)
 		if err != nil {
@@ -133,6 +143,27 @@ var slidesReplaceCmd = &cobra.Command{
 	Args: cobra.ExactArgs(3),
 	RunE: func(_ *cobra.Command, args []string) error {
 		presentationID, findText, replaceText := args[0], args[1], args[2]
+		if dryRun {
+			endpoint := fmt.Sprintf("https://slides.googleapis.com/v1/presentations/%s:batchUpdate", url.PathEscape(presentationID))
+			return printDryRunPlan(dryRunPlan{
+				Command: "slides replace",
+				Method:  http.MethodPost,
+				URL:     endpoint,
+				Payload: map[string]any{
+					"requests": []map[string]any{
+						{
+							"replaceAllText": map[string]any{
+								"containsText": map[string]any{
+									"text":      findText,
+									"matchCase": slidesMatchCase,
+								},
+								"replaceText": replaceText,
+							},
+						},
+					},
+				},
+			})
+		}
 
 		changed, err := drive.ReplacePresentationText(slidesSvc, presentationID, findText, replaceText, slidesMatchCase)
 		if err != nil {
@@ -220,6 +251,23 @@ func runSlidesNotesUpdate(presentationID string, useInline bool) error {
 			return ui.ErrorWithHint(wrapped, "Ensure the path to the speaker notes file is correct.")
 		}
 		notesText = string(raw)
+	}
+
+	if dryRun {
+		endpoint := fmt.Sprintf("https://slides.googleapis.com/v1/presentations/%s:batchUpdate", url.PathEscape(presentationID))
+		return printDryRunPlan(dryRunPlan{
+			Command: "slides notes",
+			Method:  http.MethodPost,
+			URL:     endpoint,
+			Payload: map[string]any{
+				"presentationId": presentationID,
+				"slide":          slidesNotesSlide,
+				"notes":          notesText,
+			},
+			Notes: []string{
+				"At execution time, drivectl resolves the slide's speakerNotesObjectId, deletes existing notes text (if non-empty), and inserts the replacement text.",
+			},
+		})
 	}
 
 	notesID, err := drive.UpdateSlideNotes(slidesSvc, presentationID, slidesNotesSlide, notesText)

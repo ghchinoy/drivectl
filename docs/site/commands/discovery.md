@@ -40,7 +40,13 @@ drivectl call docs.v1.documents.create \
 # Pass a large JSON payload from a file or stdin ('-')
 drivectl call slides.v1.presentations.batchUpdate --payload-file ./batch.json
 cat ./batch.json | drivectl call slides.v1.presentations.batchUpdate --payload-file -
+
+# Preview the resolved HTTP method, URL, and payload without executing the request
+drivectl call drive.v3.files.create --payload '{"name": "Draft"}' --dry-run -O json
+drivectl upload ./deck.pptx --file-id <existing-id> --convert slides --dry-run -O json
 ```
+
+`--dry-run` works across `call`, `upload`, `docs create`, `sheets update-range`, and `slides` mutators (`create`, `replace`, `notes --set/--file`), and does not require OAuth credentials to preview local requests.
 
 :::caution[Silent Permission Grants & ACL Safety]
 Google Drive API v3 defaults `sendNotificationEmail=true` on `user` and `group` permission grants when omitted, and raw `drive.v3.permissions.create` calls do not inspect existing permissions before writing. Always include `"sendNotificationEmail": false` and `"supportsAllDrives": true` when calling `drive.v3.permissions.create` directly, or use the sister CLI [`share-with`](https://github.com/ghchinoy/share-with) ([documentation](https://ghchinoy.github.io/share-with/)) for transport-enforced silent-only permission grants, `?resourcekey=...` URL parsing, and pre-grant no-downgrade collaborator protection.

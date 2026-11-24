@@ -48,6 +48,8 @@ var (
 	noBrowserAuth bool
 	// showScopes prints the minimal OAuth scopes required by a command without executing it.
 	showScopes bool
+	// dryRun previews HTTP method, URL, and payload for call and mutating commands without executing writes.
+	dryRun bool
 	// savedRunE / savedRun temporarily hold a command's handler when --show-scopes intercepts execution.
 	savedRunE func(*cobra.Command, []string) error
 	savedRun  func(*cobra.Command, []string)
@@ -81,7 +83,7 @@ Google Docs, including exporting to multiple formats and accessing individual ta
 			cmd.Run = nil
 			return nil
 		}
-		if isAuthBypassCommand(cmd) {
+		if isAuthBypassCommand(cmd) || isDryRunOfflineCommand(cmd) {
 			return nil
 		}
 		ctx := cmd.Context()
@@ -176,6 +178,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&OutputFormat, "output-format", "O", "", "output format (e.g. json)")
 	rootCmd.PersistentFlags().BoolVar(&noBrowserAuth, "no-browser-auth", false, "do not open a browser for authentication")
 	rootCmd.PersistentFlags().BoolVar(&showScopes, "show-scopes", false, "print the minimal OAuth scopes required for the command and exit")
+	rootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "preview resolved HTTP method, URL, and payload without executing write operations")
 	rootCmd.PersistentFlags().Bool("mcp", false, "enable MCP server mode over stdio")
 	rootCmd.PersistentFlags().String("mcp-http", "", "enable MCP server mode over HTTP at the given address (defaults to 127.0.0.1)")
 	_ = viper.BindPFlag("secret-file", rootCmd.PersistentFlags().Lookup("secret-file"))

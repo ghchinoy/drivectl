@@ -70,7 +70,8 @@ A Go command-line interface (CLI) and Model Context Protocol (MCP) server for in
 - **Google Docs AST Conversion:** Convert local Markdown files into formatted Google Docs (`docs create`), export Google Docs back to Markdown, PDF, or plain text (`get --format md|pdf|txt`), and inspect document tab hierarchies (`docs tabs`).
 - **Google Sheets Operations:** Export sheets to CSV (`sheets get`), read cell ranges via A1 notation (`sheets get-range`), and update cell values (`sheets update-range`).
 - **Composable Recipes (`run`):** Execute sequential multi-step CLI workflows defined in JSON files.
-- **Dual-Mode MCP Server (`--mcp` / `--mcp-http`):** Expose 14 Discovery-driven Google Workspace tools (`drive.v3.files.*`, `docs.v1.documents.*`, `sheets.v4.spreadsheets.*`, `slides.v1.presentations.*`) and embedded query/A1 cheat-sheet resources over stdio or hardened loopback HTTP.
+- **Dual-Mode MCP Server (`--mcp` / `--mcp-http`):** Expose 8 differentiated native tools (Markdown ↔ Docs AST, Slides Markdown/inspect/notes/replace, Sheets RFC 4180 CSV), 14 Discovery-driven Google Workspace tools (`drive.v3.files.*`, `docs.v1.documents.*`, `sheets.v4.spreadsheets.*`, `slides.v1.presentations.*`) with MCP `ToolAnnotations` (`ReadOnlyHint`, `DestructiveHint`, `IdempotentHint`), and 2 embedded cheat-sheet resources over stdio or hardened loopback HTTP.
+- **Dry-Run Preview Mode (`--dry-run`):** Preview the resolved HTTP method, URL, and JSON payload without executing writes across `call`, `upload`, `docs create`, `sheets update-range`, and `slides` mutators (`create`, `replace`, `notes --set/--file`).
 
 ## Installation
 
@@ -344,6 +345,11 @@ Use `drivectl call` to invoke any Google API endpoint described by Google's Disc
 # Pass a large JSON body from a file or stdin (ideal for batchUpdate requests)
 ./drivectl call slides.v1.presentations.batchUpdate --payload-file ./batch.json
 cat ./batch.json | ./drivectl call slides.v1.presentations.batchUpdate --payload-file -
+
+# Preview resolved HTTP method, URL, and payload without executing writes
+./drivectl call docs.v1.documents.create --payload '{"title": "Draft"}' --dry-run -O json
+./drivectl upload ./deck.pptx --file-id <id> --convert slides --dry-run -O json
+./drivectl slides replace <presentation-id> "Old" "New" --dry-run -O json
 ```
 
 ### Automating Workflows (`run`)
@@ -369,7 +375,15 @@ Chain multiple `drivectl` commands in a declarative JSON recipe ([`recipes/sampl
 > [!NOTE]
 > Google now hosts official remote MCP servers for [Drive, Docs, Sheets, Slides, Gmail, Calendar, Chat, People, Classroom, and Universal Search](https://developers.google.com/workspace/guides/configure-mcp-servers#support-products). Prefer those managed endpoints when connecting AI agents directly to Workspace; use `drivectl --mcp` / `mcp.RegisterTools` when you need a local single-binary MCP server without Developer Preview enrollment or want to mount Discovery-backed tools inside a custom Go MCP host.
 
-`drivectl` includes a built-in Model Context Protocol (MCP) server (`github.com/modelcontextprotocol/go-sdk`) that registers 14 dynamically generated Discovery tools (`drive.v3.files.{list,get,create,update}`, `docs.v1.documents.{create,get,batchUpdate}`, `sheets.v4.spreadsheets.{create,get}`, `sheets.v4.spreadsheets.values.{get,update}`, `slides.v1.presentations.{create,get,batchUpdate}`) and 2 embedded cheat-sheet resources (`embedded:drive-query-cheat-sheet`, `embedded:a1-notation-cheat-sheet`).
+`drivectl` includes a built-in Model Context Protocol (MCP) server (`github.com/modelcontextprotocol/go-sdk`) that registers **22 annotated tools** (all with `ReadOnlyHint`, `DestructiveHint`, `IdempotentHint`, and `OpenWorldHint` `ToolAnnotations`) plus 2 embedded cheat-sheet resources:
+
+- **8 Native Workflow Tools:**
+  - `drivectl_docs_create_from_markdown`, `drivectl_docs_export_markdown`, `drivectl_docs_tabs`
+  - `drivectl_sheets_export_csv`
+  - `drivectl_slides_get_markdown`, `drivectl_slides_inspect`, `drivectl_slides_update_notes`, `drivectl_slides_replace_text`
+- **14 Dynamic Discovery Tools:**
+  - `drive.v3.files.{list,get,create,update}`, `docs.v1.documents.{create,get,batchUpdate}`, `sheets.v4.spreadsheets.{create,get}`, `sheets.v4.spreadsheets.values.{get,update}`, `slides.v1.presentations.{create,get,batchUpdate}`
+- **2 Embedded Resources:** `embedded:drive-query-cheat-sheet`, `embedded:a1-notation-cheat-sheet`
 
 ```bash
 # Start MCP server over stdio (default for AI coding agents; auto-uses "agent" profile if configured)
