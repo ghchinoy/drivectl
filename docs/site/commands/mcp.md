@@ -3,6 +3,10 @@ title: MCP server & Agent Skill
 description: Expose Google Workspace tools to AI coding assistants over Model Context Protocol or the bundled Agent Skill.
 ---
 
+:::note[Official Google-hosted Workspace MCP servers]
+Google now offers hosted remote MCP servers for [Drive, Docs, Sheets, Slides, Gmail, Calendar, Chat, People, Classroom, and Universal Search](https://developers.google.com/workspace/guides/configure-mcp-servers#support-products) (Developer Preview). Prefer those endpoints for managed, zero-ops agent connections; use `drivectl --mcp` or `mcp.RegisterTools` when you want a local single-binary MCP server without Developer Preview enrollment or need to embed Discovery-backed tools inside a Go MCP server.
+:::
+
 ## Start the MCP server
 
 `drivectl` embeds a Model Context Protocol (MCP) server built on `github.com/modelcontextprotocol/go-sdk/mcp`.

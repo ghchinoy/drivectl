@@ -5,7 +5,13 @@ description: Interact with Google Drive, Docs, and Sheets from your terminal or 
 
 ## What is drivectl?
 
-`drivectl` is a command-line interface (CLI) and Model Context Protocol (MCP) server written in Go for interacting with **Google Drive**, **Google Docs**, and **Google Sheets**, as well as arbitrary Google Workspace REST endpoints via Google API Discovery Documents.
+:::note[Official Google Workspace CLI & Remote MCP servers]
+Google now provides an official [Google Workspace CLI](https://developers.google.com/workspace/guides/workspace-cli) and hosted [Google Workspace Remote MCP servers](https://developers.google.com/workspace/guides/configure-mcp-servers#support-products). Start with those for general Workspace automation, hosted MCP integrations, or multi-product workflows (Gmail, Calendar, Chat, Universal Search).
+
+`drivectl` remains a strong fit when you need an **embeddable Go library** (`pkg/drive`, `pkg/discovery`, `mcp.RegisterTools`), **Markdown $\leftrightarrow$ Google Docs** AST conversion, **Google Slides CLI ergonomics** (including in-place `.pptx` conversion), or a single-binary local CLI/MCP without Developer Preview enrollment.
+:::
+
+`drivectl` is a command-line interface (CLI) and Model Context Protocol (MCP) server written in Go for interacting with **Google Drive**, **Google Docs**, **Google Sheets**, and **Google Slides**, as well as arbitrary Google Workspace REST endpoints via Google API Discovery Documents.
 
 It is designed for both human developers working in an interactive shell and AI coding agents that require deterministic JSON output (`-O json`), proactive error hints, and structured tool schemas.
 
