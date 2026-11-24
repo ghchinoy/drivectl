@@ -3,6 +3,14 @@ title: Install drivectl
 description: Install the drivectl binary, configure Google OAuth credentials, and optional agent integrations.
 ---
 
+## Homebrew (macOS & Linux)
+
+Install via the [`ghchinoy/homebrew-tap`](https://github.com/ghchinoy/homebrew-tap) tap:
+
+```sh
+brew install ghchinoy/tap/drivectl
+```
+
 ## Prebuilt binaries (macOS & Linux)
 
 Download and verify the latest release binary into your current directory using the [bundled installer script](../../skills/google-drive-cli/scripts/install.sh):
@@ -42,6 +50,17 @@ Before authenticating for the first time, create a **Desktop app** OAuth 2.0 cli
 - an **API key**, or
 - a **Web application** OAuth client (`{"web": ...}`), which does not allow ephemeral loopback redirect ports (`http://127.0.0.1:<port>`).
 :::
+
+:::tip[Quick setup: Google Personal Mode (single user)]
+If you are configuring `drivectl` for your own Google Account, Google Cloud Console's **Personal mode onboarding** creates a single-user Desktop OAuth 2.0 client, enables core Workspace APIs automatically, and skips OAuth consent screen setup and app verification:
+
+- [Open Personal mode setup (Desktop app)](https://console.cloud.google.com/auth/overview/personal?apis=ws&clientType=desktop)
+- [Open Personal mode setup (AI agent / `--agentic` profile)](https://console.cloud.google.com/auth/overview/personal?apis=ws&clientType=desktop&isAgent=true)
+
+Download the generated JSON as `client_secret.json` and skip straight to [Getting started](/drivectl/getting-started).
+:::
+
+### Manual setup (Workspace org or existing project)
 
 1. Open the [Google Cloud Console](https://console.cloud.google.com/) and select or create a project.
 2. Navigate to **APIs & Services > Library** and enable:

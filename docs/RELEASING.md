@@ -12,6 +12,11 @@ This workflow spins up a runner that:
 3. Packages the binaries into `.tar.gz` and `.zip` archives.
 4. Auto-generates a Changelog based on the git commit history since the last tag.
 5. Publishes all artifacts to a new release on the GitHub Repository Releases page.
+6. Updates `Casks/drivectl.rb` in [`ghchinoy/homebrew-tap`](https://github.com/ghchinoy/homebrew-tap) so `brew install ghchinoy/tap/drivectl` receives the new version automatically.
+
+## Prerequisites
+
+- **`HOMEBREW_TAP_GITHUB_TOKEN` repository secret:** Configure a fine-grained GitHub Personal Access Token with **Contents: Read and write** permission on `ghchinoy/homebrew-tap` in this repository's Actions secrets (`Settings > Secrets and variables > Actions`) so GoReleaser can publish the updated Homebrew cask on release tags.
 
 ## Step-by-Step Release Guide
 

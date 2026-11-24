@@ -69,7 +69,7 @@ Copy [settings.json.sample](../../../settings.json.sample) to `.gemini/settings.
 
 ## Install the bundled Agent Skill
 
-The repository includes the [google-drive-cli Agent Skill](../../../skills/google-drive-cli/SKILL.md) with progressive-disclosure references for [Drive](../../../skills/google-drive-cli/references/drive.md), [Docs](../../../skills/google-drive-cli/references/docs.md), [Sheets](../../../skills/google-drive-cli/references/sheets.md), and [Discovery](../../../skills/google-drive-cli/references/discovery.md).
+The repository includes the [google-drive-cli Agent Skill](../../../skills/google-drive-cli/SKILL.md) with progressive-disclosure references for [Drive](../../../skills/google-drive-cli/references/drive.md), [Docs](../../../skills/google-drive-cli/references/docs.md), [Sheets](../../../skills/google-drive-cli/references/sheets.md), [Slides](../../../skills/google-drive-cli/references/slides.md), and [Discovery](../../../skills/google-drive-cli/references/discovery.md).
 
 ```sh
 # Install via Open Agent Skills CLI

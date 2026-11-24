@@ -74,6 +74,12 @@ A Go command-line interface (CLI) and Model Context Protocol (MCP) server for in
 
 ## Installation
 
+### Homebrew (macOS & Linux)
+
+```bash
+brew install ghchinoy/tap/drivectl
+```
+
 ### Prebuilt Binaries (macOS & Linux)
 
 Download and verify the latest release binary into your current directory using the bundled installer script ([`skills/google-drive-cli/scripts/install.sh`](skills/google-drive-cli/scripts/install.sh)):
@@ -118,7 +124,17 @@ Once installed and provided with a Desktop OAuth `client_secret.json` (see [Gett
 `drivectl` authenticates as your Google user via an **OAuth 2.0 Desktop app** client secret.
 
 > [!IMPORTANT]
-> You need an **OAuth 2.0 Client ID (Desktop app)** JSON file whose top-level key is `{"installed": {...}}`. Do **not** use a **Service Account** JSON key (`{"type": "service_account", ...}` — not currently supported), an **API key**, or a **Web application** OAuth client (`{"web": ...}`, which rejects loopback redirects unless `http://localhost:8080` is manually registered).
+> You need an **OAuth 2.0 Client ID (Desktop app)** JSON file whose top-level key is `{"installed": {...}}`. Do **not** use a **Service Account** JSON key (`{"type": "service_account", ...}` — not currently supported), an **API key**, or a **Web application** OAuth client (`{"web": ...}`, which does not allow ephemeral loopback redirect ports `http://127.0.0.1:<port>`).
+
+### Quick Setup: Google Personal Mode (Single User)
+
+For personal single-user setups, Google Cloud Console's **Personal mode onboarding** creates a Desktop OAuth 2.0 client tied to your Google Account, enables core Workspace APIs automatically, and skips OAuth consent screen setup and app verification:
+
+1. Open [Personal mode setup (Desktop app)](https://console.cloud.google.com/auth/overview/personal?apis=ws&clientType=desktop) (or [Personal mode setup for AI agent / MCP](https://console.cloud.google.com/auth/overview/personal?apis=ws&clientType=desktop&isAgent=true) for a dedicated `--agentic` profile).
+2. Select or create a personal-mode project, click **Create Client**, and download the JSON as `client_secret.json`.
+3. Authenticate with `drivectl auth login --secret-file client_secret.json` (or `--agentic` for an agent client).
+
+### Manual Setup (Workspace Org or Existing Project)
 
 1. Open the [Google Cloud Console](https://console.cloud.google.com/) and create or select a project.
 2. Navigate to **APIs & Services > Library** and enable:
@@ -131,6 +147,7 @@ Once installed and provided with a Desktop OAuth `client_secret.json` (see [Gett
    - Under **Audience**, choose **Internal** (if you are in a Google Workspace organization and only org users will sign in) or **External** (for personal Gmail accounts or cross-org use).
    - If **External** is left in **Testing** publishing status, open **Audience > Test users** and add the Google email address(es) you will authenticate with — otherwise login fails with `Error 403: access_denied`. *(Note: Google expires refresh tokens for External apps in Testing mode after 7 days; re-run `drivectl auth login` when needed.)*
 4. Navigate to **Google Auth Platform > Clients** (or **APIs & Services > Credentials**), click **Create Client** / **Create Credentials > OAuth client ID**, and select **Desktop app** as the application type.
+   - If creating a dedicated client for AI agent / MCP usage, check **Use this client for an AI-powered agent** and authenticate it with `drivectl auth login --agentic --secret-file <path>`.
 5. Download the JSON file (verify it starts with `{"installed": ...}`), save it as `client_secret.json`, and pass it once to `drivectl auth login --secret-file client_secret.json` (or set `DRIVE_SECRETS=/path/to/client_secret.json`).
 
 ## Usage & Command Reference
@@ -394,7 +411,7 @@ err := drivectlmcp.RegisterTools(ctx, server, func(ctx context.Context) (*http.C
 
 ## Agent Skill & Gemini CLI Configuration
 
-- **Bundled Agent Skill:** [`skills/google-drive-cli/SKILL.md`](skills/google-drive-cli/SKILL.md) provides progressive-disclosure instructions and references ([`drive.md`](skills/google-drive-cli/references/drive.md), [`docs.md`](skills/google-drive-cli/references/docs.md), [`sheets.md`](skills/google-drive-cli/references/sheets.md), [`discovery.md`](skills/google-drive-cli/references/discovery.md)) for AI coding agents.
+- **Bundled Agent Skill:** [`skills/google-drive-cli/SKILL.md`](skills/google-drive-cli/SKILL.md) provides progressive-disclosure instructions and references ([`drive.md`](skills/google-drive-cli/references/drive.md), [`docs.md`](skills/google-drive-cli/references/docs.md), [`sheets.md`](skills/google-drive-cli/references/sheets.md), [`slides.md`](skills/google-drive-cli/references/slides.md), [`discovery.md`](skills/google-drive-cli/references/discovery.md)) for AI coding agents.
 - **Gemini CLI:** Copy [`settings.json.sample`](settings.json.sample) to `.gemini/settings.json` in your project root and update the binary path to register `drivectl` as an MCP server.
 
 ## Local Development
@@ -467,6 +484,7 @@ Issues and pull requests are welcome! Before opening a pull request:
 - **`unable to parse client secret file to config`:** Ensure your JSON file is an **OAuth 2.0 Desktop app** client secret (`{"installed": {...}}`), not a Service Account key (`{"type": "service_account", ...}`) or API key.
 - **`Error 403: access_denied` during browser consent:** Your Google Cloud project's OAuth consent screen is set to **External** in **Testing** mode. Open **Google Auth Platform > Audience > Test users** in the Google Cloud Console and add the Google account you are signing in with.
 - **`decrypting cached token` / rotated encryption key:** If `.encryption_key` or `DRIVECTL_ENCRYPTION_KEY` changed, clear the cached token with `drivectl auth logout` and re-authenticate with `drivectl auth login`.
+- **Repeated hourly sign-in prompts (`has_refresh_token: false` in `drivectl auth status -O json`):** Google only issues a refresh token on first offline consent. Remove the app's existing grant in [Google Account connections](https://myaccount.google.com/connections) and re-run `drivectl auth login` to receive a fresh refresh token.
 - **Browser does not open on a remote or SSH host:** Pass `--no-browser-auth` to `drivectl auth login`, open the printed authorization URL on your local machine, and paste the `code` query parameter from the resulting redirect URL into the terminal.
 - **`403 Forbidden: Google Drive/Docs/Sheets/Slides API has not been used in project`:** Enable the corresponding API (`drive.googleapis.com`, `docs.googleapis.com`, `sheets.googleapis.com`, `slides.googleapis.com`) in the Google Cloud Console for the project that owns your OAuth client ID.
 

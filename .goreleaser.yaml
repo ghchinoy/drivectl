@@ -46,3 +46,22 @@ release:
   github:
     owner: ghchinoy
     name: drivectl
+
+homebrew_casks:
+  - name: drivectl
+    binaries:
+      - drivectl
+    homepage: "https://ghchinoy.github.io/drivectl/"
+    description: "Go CLI and MCP server for Google Drive, Docs, Sheets, and Slides"
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/drivectl"]
+          end
+    repository:
+      owner: ghchinoy
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    skip_upload: auto

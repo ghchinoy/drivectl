@@ -41,6 +41,11 @@ const startingPoints = [
 
 const installMethods = [
   {
+    name: 'Homebrew',
+    step: 'Install via the ghchinoy/homebrew-tap cask on macOS or Linux.',
+    copy: 'brew install ghchinoy/tap/drivectl',
+  },
+  {
     name: 'Prebuilt binary',
     step: 'Download and verify the latest release binary into your current directory.',
     copy: 'curl -sL https://raw.githubusercontent.com/ghchinoy/drivectl/main/skills/google-drive-cli/scripts/install.sh | bash',

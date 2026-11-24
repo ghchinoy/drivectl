@@ -17,7 +17,7 @@ drivectl call <api>.<version>.<resource>.<method> --payload '<json-string>' -O j
         *   `drive.v3.files.get`
         *   `docs.v1.documents.create`
         *   `drive.v3.permissions.create`
-2.  **`--payload`**: This flag accepts a JSON string. This JSON object serves a dual purpose:
+2.  **`--payload` / `--payload-file`**: Pass a JSON object inline with `--payload '<json>'`, from disk with `--payload-file ./payload.json`, or from stdin with `--payload-file -`. This JSON object serves a dual purpose:
     *   It populates **URL path parameters** (e.g., `fileId`, `documentId`).
     *   It populates **URL query parameters** (e.g., `fields`, `pageSize`).
     *   It populates the **Request Body** for methods like `POST`, `PUT`, or `PATCH`.

@@ -26,14 +26,31 @@ drivectl list -q "name contains 'Project'" -O json
 drivectl list -q "mimeType='application/vnd.google-apps.document'" -O json
 ```
 
-## Downloading / Getting File Content
+## Describing & Downloading File Content
 
-To download a file or its raw content to stdout:
+**Inspect detailed metadata:**
 ```bash
-drivectl get <file-id>
+drivectl describe <file-id> -O json
 ```
 
-*(Note: For Google Workspace documents, you often want to convert them during export. For example, to convert Google Docs to Markdown, see docs.md).*
+**Download raw file content to stdout (or export Google Docs via `--format md|pdf|txt`):**
+```bash
+drivectl get <file-id>
+drivectl get <google-doc-id> --format md -o notes.md
+```
+
+## Uploading & Updating Files
+
+```bash
+# Upload a local file to Drive (optional --parent <folder-id>, --name, --mime-type)
+drivectl upload ./report.pdf --name "Q3 Report.pdf" -O json
+
+# Upload and convert a local file to native Google Slides, Docs, or Sheets
+drivectl upload ./deck.pptx --name "Workshop Deck" --convert slides -O json
+
+# Update an existing Drive or Google Workspace file in place (preserves share URL and permissions)
+drivectl upload ./deck.pptx --file-id <existing-file-id> --convert slides -O json
+```
 
 ## Revisions and Comments
 
