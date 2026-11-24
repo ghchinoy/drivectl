@@ -235,11 +235,7 @@ func TestCLICommands(t *testing.T) {
 				f.Changed = false
 			}
 
-			if tc.stdin != "" {
-				rootCmd.SetIn(strings.NewReader(tc.stdin))
-			} else {
-				rootCmd.SetIn(strings.NewReader(""))
-			}
+			rootCmd.SetIn(strings.NewReader(tc.stdin))
 			rootCmd.SetArgs(tc.args)
 			err := ExecuteContext(ctx)
 			if (err != nil) != tc.wantErr {

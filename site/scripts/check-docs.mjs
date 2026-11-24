@@ -90,6 +90,7 @@ const pages = [
   'commands/drive',
   'commands/docs',
   'commands/sheets',
+  'commands/slides',
   'commands/discovery',
   'commands/mcp',
 ];

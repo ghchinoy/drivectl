@@ -58,3 +58,6 @@ site/.astro/
 
 # Beads / Dolt files (added by bd init)
 .beads-credential-key
+
+# Local AI agent state
+.serena/

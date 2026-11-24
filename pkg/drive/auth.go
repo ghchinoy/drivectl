@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/pkg/browser"
 	"golang.org/x/oauth2"
@@ -199,8 +200,9 @@ func FetchTokenFromWebWithBrowser(ctx context.Context, config *oauth2.Config) (*
 	errChan := make(chan error, 1)
 
 	srv := &http.Server{
-		Addr:    ":8080",
-		Handler: newOAuthCallbackHandler(codeChan, errChan),
+		Addr:              ":8080",
+		Handler:           newOAuthCallbackHandler(codeChan, errChan),
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 	defer func() {
 		_ = srv.Shutdown(context.WithoutCancel(ctx))

@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
@@ -105,8 +106,9 @@ func Start(ctx context.Context, _ *cobra.Command, httpAddr string) error {
 			return server
 		}, nil)
 		srv := &http.Server{
-			Addr:    httpAddr,
-			Handler: handler,
+			Addr:              httpAddr,
+			Handler:           handler,
+			ReadHeaderTimeout: 10 * time.Second,
 		}
 		go func() {
 			<-ctx.Done()

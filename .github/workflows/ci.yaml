@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.golangci.yml'
+      - '.github/workflows/ci.yaml'
+  pull_request:
+    paths:
+      - '**.go'
+      - 'go.mod'
+      - 'go.sum'
+      - '.golangci.yml'
+      - '.github/workflows/ci.yaml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  go:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.11'
+          cache: true
+
+      - name: Build (CGO_ENABLED=1 and CGO_ENABLED=0)
+        run: |
+          CGO_ENABLED=1 go build ./...
+          CGO_ENABLED=0 go build ./...
+
+      - name: Vet and test with race detector
+        run: |
+          go vet ./...
+          go test -race ./...
+
+      - name: Lint (golangci-lint v2)
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: latest
+          args: -E gocyclo -E cyclop -E gocognit ./...
+
+      - name: Vulnerability check (govulncheck)
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
