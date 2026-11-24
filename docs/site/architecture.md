@@ -5,7 +5,7 @@ description: How drivectl balances ergonomic native commands, dynamic API Discov
 
 ## Generic Discovery vs. native subcommands
 
-A central design principle in `drivectl` (documented in [Design Philosophy](../../docs/DESIGN_PHILOSOPHY.md)) is balancing the dynamic `call` command with dedicated native subcommands (`list`, `get`, `upload`, `docs`, `sheets`).
+A central design principle in `drivectl` (documented in [Design Philosophy](../../docs/DESIGN_PHILOSOPHY.md)) is balancing the dynamic `call` command with dedicated native subcommands (`list`, `get`, `upload`, `docs`, `sheets`, `slides`).
 
 ### When `call` is used
 
@@ -28,19 +28,19 @@ Whenever an operation involves binary streaming, multi-step protocols, or AST tr
 
 ## Using `drivectl` as a Go library
 
-External Go services (such as Cloud Run / Corp Run backends) can import `github.com/ghchinoy/drivectl` directly without touching local disk configuration:
+External Go services (such as Cloud Run backends or custom Go MCP hosts) can import `github.com/ghchinoy/drivectl` directly without touching local disk configuration:
 
-- **`github.com/ghchinoy/drivectl/pkg/drive`:** Stateless `NewClientFromBearerToken`, `NewClientFromTokenSource`, and `NewServicesFromClient` constructors plus `FetchFile`, `FetchTabs`, `CreateDocFromMarkdown`, `FetchSheetAsCSV`, and `FetchPresentationAsMarkdown`.
+- **`github.com/ghchinoy/drivectl/pkg/drive`:** Stateless `NewClientFromBearerToken`, `NewClientFromTokenSource`, and `NewServicesFromClient` constructors plus `FetchFile`, `FetchTabs`, `CreateDocFromMarkdown`, `FetchSheetAsCSV`, `FetchPresentationAsMarkdown`, `SummarizePresentation`, `ReplacePresentationText`, and `UpdateSlideNotes`.
 - **`github.com/ghchinoy/drivectl/pkg/discovery`:** `FetchDiscoveryDocument`, `CallMethod`, `BuildRequest`, and `MethodToSchema`.
-- **`github.com/ghchinoy/drivectl/mcp`:** `RegisterTools(ctx, server, clientProvider, opts...)` mounts `drivectl`'s resources and Discovery tools onto any in-process `*mcp.Server`.
+- **`github.com/ghchinoy/drivectl/mcp`:** `RegisterTools(ctx, server, clientProvider, opts...)` mounts `drivectl`'s 8 native workflow tools, 14 Discovery tools (all with MCP `ToolAnnotations`), and 2 embedded resources onto any in-process `*mcp.Server`.
 
 ## Agent-aware CLI design
 
-`drivectl` follows Agent-to-Agent (A2A) CLI conventions:
+`drivectl` follows agent-aware CLI conventions:
 
-1. **Semantic command groups:** Subcommands are organized into `workspace` (Drive, Docs, Sheets), `api` (`call`, `run`), and `config` (`auth`).
-2. **Deterministic JSON mode:** Passing `-O json` (`--output-format json`) suppresses terminal styling and emits structured JSON on stdout.
-3. **Actionable error hints:** Authentication and API errors include remediation hints (such as re-running `drivectl auth login` or enabling the target API in Google Cloud Console).
+1. **Semantic command groups:** Subcommands are organized into `auth`, `core` (`list`, `describe`, `get`, `upload`, `revisions`, `comments`), `integration` (`docs`, `sheets`, `slides`), and `advanced` (`call`, `run`).
+2. **Deterministic JSON mode & `--dry-run`:** Passing `-O json` (`--output-format json`) suppresses terminal styling and emits structured JSON on stdout; passing `--dry-run` previews write requests offline without mutating Google Workspace.
+3. **Actionable error hints & least-privilege scopes:** Authentication and API errors include remediation hints, and `--show-scopes` / `auth scopes` let agents inspect minimal required OAuth scopes before running a command.
 
 ## MCP schema normalization
 

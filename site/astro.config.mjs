@@ -13,7 +13,7 @@ export default defineConfig({
 
   integrations: [starlight({
     title: 'drivectl',
-    description: 'Google Drive, Docs, and Sheets CLI & MCP server for developers and AI coding agents.',
+    description: 'Google Drive, Docs, Sheets, and Slides CLI & MCP server for developers and AI coding agents.',
     favicon: '/favicon.svg',
     credits: false,
     expressiveCode: {
@@ -61,7 +61,7 @@ export default defineConfig({
       },
     ],
     plugins: [starlightLlmsTxt({
-      details: 'drivectl provides ergonomic native subcommands for Google Drive, Docs (Markdown AST conversion), and Sheets (A1 notation), a generic Discovery API caller (drivectl call), and a stdio/HTTP MCP server.',
+      details: 'drivectl provides ergonomic native subcommands for Google Drive, Docs (Markdown AST conversion), Sheets (A1 notation & RFC 4180 CSV), and Slides (Markdown render, inspect, replace, speaker notes, in-place .pptx conversion), a generic Discovery API caller (drivectl call) with --dry-run, and a stdio/HTTP MCP server with 22 annotated tools.',
     })],
   })],
 

@@ -19,17 +19,17 @@ Purpose-built subcommands for common Google Workspace file and document operatio
 
   Export sheets to CSV, read cell values via A1 notation, and update cells from the command line.
 
-- [Google Slides](/drivectl/commands/slides) `slides get · slides create · upload --convert slides`
+- [Google Slides](/drivectl/commands/slides) `slides get · slides create · slides inspect · slides replace · slides notes · upload --convert slides`
 
-  Render presentations (slides, tables, and speaker notes) as Markdown, create decks via the Slides API, or upload `.pptx` decks with automatic Google Slides conversion.
+  Render presentations (slides, tables, and speaker notes) as Markdown, create decks, inspect `objectId`s, replace text, edit speaker notes, or upload `.pptx` decks in place with automatic Google Slides conversion.
 
 ## Dynamic API & automation
 
-Call any Google Workspace REST method or chain commands into repeatable workflows.
+Call any Google Workspace REST method, preview writes with `--dry-run`, or chain commands into repeatable workflows.
 
-- [Dynamic Discovery (`call`)](/drivectl/commands/discovery) `call · run`
+- [Dynamic Discovery (`call`)](/drivectl/commands/discovery) `call · --dry-run · run`
 
-  Invoke arbitrary Google API endpoints via live Discovery Documents and execute multi-step JSON recipes.
+  Invoke arbitrary Google API endpoints via live Discovery Documents (`--payload` or `--payload-file`), preview HTTP requests with `--dry-run`, and execute multi-step JSON recipes.
 
 ## AI agent integration
 

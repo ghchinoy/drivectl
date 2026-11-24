@@ -5,14 +5,14 @@ description: Convert Markdown into formatted Google Docs, export Docs back to Ma
 
 ## Create a Google Doc from Markdown (`docs create`)
 
-`drivectl docs create` creates a new Google Doc and optionally converts a local Markdown file into native Google Docs structural elements (headings, bold/italic/strikethrough, inline code, links, lists, and code blocks):
+`drivectl docs create` creates a new Google Doc and converts a local Markdown file into native Google Docs structural elements (headings, bold/italic/strikethrough, inline code, links, lists, and code blocks):
 
 ```sh
-# Create an empty Google Doc
-drivectl docs create "Meeting Notes" -O json
-
 # Convert a local Markdown file into a formatted Google Doc
 drivectl docs create "Design Specification" ./docs/DESIGN_PHILOSOPHY.md -O json
+
+# Preview the generated Docs API batchUpdate requests without creating a document
+drivectl docs create "Design Specification" ./docs/DESIGN_PHILOSOPHY.md --dry-run -O json
 ```
 
 When `-O json` is passed, `drivectl` returns the new `documentId`, `title`, and `url` (`https://docs.google.com/document/d/<id>/edit`).

@@ -50,6 +50,7 @@ A Go command-line interface (CLI) and Model Context Protocol (MCP) server for in
   - [Google Drive Files (`list`, `describe`, `get`, `upload`, `revisions`, `comments`)](#google-drive-files-list-describe-get-upload-revisions-comments)
   - [Google Docs (`docs`)](#google-docs-docs)
   - [Google Sheets (`sheets`)](#google-sheets-sheets)
+  - [Google Slides (`slides`)](#google-slides-slides)
   - [Dynamic Discovery Calls (`call`)](#dynamic-discovery-calls-call)
   - [Automating Workflows (`run`)](#automating-workflows-run)
 - [MCP Server Mode](#mcp-server-mode)
@@ -63,12 +64,13 @@ A Go command-line interface (CLI) and Model Context Protocol (MCP) server for in
 
 ## Features
 
-- **Robust Authentication:** OAuth 2.0 login with automatic local credential caching (`~/.config/drivectl/`), silent token refresh, and headless `--no-browser-auth` support.
-- **Agent-Friendly UX:** Semantic command grouping (`workspace`, `api`, `config`), color-coded terminal output, proactive error hints, and deterministic JSON output (`-O json`).
-- **Dynamic API Discovery (`call`):** Invoke *any* Google Workspace REST endpoint (`drive.v3.*`, `docs.v1.*`, `sheets.v4.*`, etc.) dynamically from live Google API Discovery Documents.
-- **Google Drive Operations:** List files with Drive query syntax (`-q`), inspect file metadata (`describe`), upload local files with custom MIME types (`upload`), download or export content (`get`), and inspect revision history (`revisions`) and threaded comments (`comments`).
+- **Hardened Authentication & Profiles:** OAuth 2.0 login with PKCE (`S256`), ephemeral `127.0.0.1` loopback callback, AES-256-GCM encrypted token caching (`~/.config/drivectl/`), least-privilege `--readonly`/`--services` incremental scopes, `--agentic` profile separation, `DRIVECTL_TOKEN`/`--token-file` headless CI auth, `auth status`/`refresh`/`logout` (with revocation)/`reset`, and `--no-browser-auth` support.
+- **Agent-Friendly UX:** Semantic command grouping (`auth`, `core`, `integration`, `advanced`), `--show-scopes` inspection, color-coded terminal output, proactive error hints, and deterministic JSON output (`-O json`).
+- **Dynamic API Discovery (`call`):** Invoke *any* Google Workspace REST endpoint (`drive.v3.*`, `docs.v1.*`, `sheets.v4.*`, `slides.v1.*`, etc.) dynamically from live Google API Discovery Documents via `--payload` or `--payload-file`.
+- **Google Drive Operations:** List files with Drive query syntax (`-q`), inspect file metadata (`describe`), upload or update files in place (`upload --file-id --convert slides|docs|sheets`), download or export content (`get`), and inspect revision history (`revisions`) and threaded comments (`comments`).
 - **Google Docs AST Conversion:** Convert local Markdown files into formatted Google Docs (`docs create`), export Google Docs back to Markdown, PDF, or plain text (`get --format md|pdf|txt`), and inspect document tab hierarchies (`docs tabs`).
-- **Google Sheets Operations:** Export sheets to CSV (`sheets get`), read cell ranges via A1 notation (`sheets get-range`), and update cell values (`sheets update-range`).
+- **Google Sheets Operations:** Export sheets to RFC 4180 CSV (`sheets get`), read cell ranges via A1 notation (`sheets get-range`), and update cell values (`sheets update-range`).
+- **Google Slides Operations:** Create decks (`slides create`), render slides/tables/speaker notes as Markdown (`slides get`), inspect `objectId` outlines (`slides inspect`), replace text (`slides replace`), edit speaker notes (`slides notes`), and convert `.pptx` decks in place (`upload --convert slides --file-id`).
 - **Composable Recipes (`run`):** Execute sequential multi-step CLI workflows defined in JSON files.
 - **Dual-Mode MCP Server (`--mcp` / `--mcp-http`):** Expose 8 differentiated native tools (Markdown ↔ Docs AST, Slides Markdown/inspect/notes/replace, Sheets RFC 4180 CSV), 14 Discovery-driven Google Workspace tools (`drive.v3.files.*`, `docs.v1.documents.*`, `sheets.v4.spreadsheets.*`, `slides.v1.presentations.*`) with MCP `ToolAnnotations` (`ReadOnlyHint`, `DestructiveHint`, `IdempotentHint`), and 2 embedded cheat-sheet resources over stdio or hardened loopback HTTP.
 - **Dry-Run Preview Mode (`--dry-run`):** Preview the resolved HTTP method, URL, and JSON payload without executing writes across `call`, `upload`, `docs create`, `sheets update-range`, and `slides` mutators (`create`, `replace`, `notes --set/--file`).
